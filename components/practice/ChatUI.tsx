@@ -190,8 +190,13 @@ Maximum 15 words per reply. Use 1-2 emojis. ONE sentence only.`;
         AsyncStorage.setItem(chatKey, JSON.stringify(next));
         return next;
       });
-    } catch {
-      const tutorMsg: Message = { id: (Date.now() + 1).toString(), text: getFallback(lang), sender: 'tutor' };
+    } catch (err: any) {
+      console.log('Groq Error:', err);
+      const tutorMsg: Message = { 
+        id: (Date.now() + 1).toString(), 
+        text: `Error: ${err.message || 'Network/CORS'} - ${getFallback(lang)}`, 
+        sender: 'tutor' 
+      };
       setMessages(prev => {
         const next = [...prev, tutorMsg];
         AsyncStorage.setItem(chatKey, JSON.stringify(next));
