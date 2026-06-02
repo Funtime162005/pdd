@@ -264,7 +264,7 @@ export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: s
         onLayout={(e) => setCanvasSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
       >
         {/* Reference letter — rendered as plain text behind SVG */}
-        {tier !== 'Advanced' && (
+        {isBeginner && (
           <View style={[styles.referenceContainer, { paddingHorizontal: 20 }]} pointerEvents="none">
             <Text 
               adjustsFontSizeToFit 
@@ -273,9 +273,7 @@ export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: s
                 styles.referenceLetter,
                 !isBeginner && { fontSize: 130 }
               ]}>
-              {isBeginner
-                ? letters[currentLetterIndex]
-                : (advancedChallenges[currentLetterIndex]?.expectedTranslation || '')}
+              {letters[currentLetterIndex]}
             </Text>
           </View>
         )}
