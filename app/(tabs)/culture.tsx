@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  useWindowDimensions, Platform, Modal, Alert
+  useWindowDimensions, Platform, Modal
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
-  FadeInUp, FadeInRight, FadeIn, FadeOut,
+  FadeInUp, FadeInRight, FadeIn,
   useSharedValue, useAnimatedStyle,
   withSpring, withRepeat, withSequence, withTiming, Easing, ZoomIn, ZoomOut
 } from 'react-native-reanimated';
@@ -14,6 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 import { CULTURE_DATA } from '../../constants/translations';
 import MascotAssistant from '../../components/MascotAssistant';
 import { Colors, Fonts, Radius, Shadow } from '../../components/KidsTheme';
+import StoriesSection from '../../components/culture/StoriesSection';
 
 const LANGUAGE_NAMES: Record<string, string> = {
   tamil: 'Tamil Nadu 🌺',
@@ -268,6 +269,9 @@ export default function CultureScreen() {
             })}
           </ScrollView>
         </View>
+
+        {/* Stories Section */}
+        <StoriesSection language={lang} />
 
         {/* Traditional Arts */}
         <View style={styles.section}>

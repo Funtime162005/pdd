@@ -554,3 +554,12 @@ export async function generateFoundationsLesson(language: string, level: string)
   }
 }
 
+
+// ===== STORIES =====
+export type CultureStory = {
+  title: string;
+  titleNative: string;
+  emoji: string;
+  paragraphs: { native: string; english: string }[];
+};
+
