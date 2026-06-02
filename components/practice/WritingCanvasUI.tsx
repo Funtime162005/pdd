@@ -264,16 +264,21 @@ export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: s
         onLayout={(e) => setCanvasSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
       >
         {/* Reference letter — rendered as plain text behind SVG */}
-        <View style={styles.referenceContainer} pointerEvents="none">
-          <Text style={[
-            styles.referenceLetter,
-            !isBeginner && { fontSize: 90 }
-          ]}>
-            {isBeginner
-              ? letters[currentLetterIndex]
-              : (advancedChallenges[currentLetterIndex]?.expectedTranslation || '')}
-          </Text>
-        </View>
+        {tier !== 'Advanced' && (
+          <View style={[styles.referenceContainer, { paddingHorizontal: 20 }]} pointerEvents="none">
+            <Text 
+              adjustsFontSizeToFit 
+              numberOfLines={1}
+              style={[
+                styles.referenceLetter,
+                !isBeginner && { fontSize: 130 }
+              ]}>
+              {isBeginner
+                ? letters[currentLetterIndex]
+                : (advancedChallenges[currentLetterIndex]?.expectedTranslation || '')}
+            </Text>
+          </View>
+        )}
 
         {/* Transparent SVG drawing layer on top */}
         <View style={styles.drawingArea} {...panResponder.panHandlers}>
