@@ -198,7 +198,7 @@ export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: s
         : advancedChallenges[currentLetterIndex]?.expectedTranslation || '';
 
       const base64 = await captureCanvasAsBase64();
-      const evalResult = await evaluateHandwriting(base64, expectedWord, language);
+      const evalResult = await evaluateHandwriting(base64, expectedWord, language, paths);
       setEvaluation(evalResult);
     } catch (e) {
       console.error(e);
