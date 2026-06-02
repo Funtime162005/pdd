@@ -289,22 +289,56 @@ export type HandwritingEvaluation = {
   breakdown?: { label: string; score: number; note: string }[];
 };
 
-// Fallback: score based on stroke data when vision API fails
+// Smart fallback: analyse stroke geometry when vision API is unavailable
 function strokeBasedScore(paths: { x: number; y: number }[][]): HandwritingEvaluation {
   const strokeCount = paths.length;
   const totalPoints = paths.reduce((sum, p) => sum + p.length, 0);
-  // A reasonable attempt has 2+ strokes and 30+ points
-  const hasEnoughStrokes = strokeCount >= 2 ? 85 : strokeCount === 1 ? 60 : 30;
-  const hasEnoughDetail = totalPoints >= 30 ? 10 : 0;
-  const score = Math.min(95, hasEnoughStrokes + hasEnoughDetail);
+
+  // Count direction changes (complexity indicator)
+  let directionChanges = 0;
+  for (const path of paths) {
+    for (let i = 2; i < path.length; i++) {
+      const dx1 = path[i - 1].x - path[i - 2].x;
+      const dy1 = path[i - 1].y - path[i - 2].y;
+      const dx2 = path[i].x - path[i - 1].x;
+      const dy2 = path[i].y - path[i - 1].y;
+      const dot = dx1 * dx2 + dy1 * dy2;
+      if (dot < 0) directionChanges++;
+    }
+  }
+
+  // Bounding box coverage
+  const allPoints = paths.flat();
+  if (allPoints.length === 0) return { score: 0, feedback: 'Nothing drawn yet!', breakdown: [] };
+  const xs = allPoints.map(p => p.x);
+  const ys = allPoints.map(p => p.y);
+  const width = Math.max(...xs) - Math.min(...xs);
+  const height = Math.max(...ys) - Math.min(...ys);
+  const area = width * height;
+
+  // Score components
+  const detailScore   = Math.min(100, Math.round((totalPoints / 150) * 100));       // 150 pts = full marks
+  const complexScore  = Math.min(100, Math.round((directionChanges / 40) * 100));   // 40 changes = full marks
+  const coverageScore = Math.min(100, Math.round((area / 20000) * 100));            // reasonable area
+  const strokeScore   = strokeCount >= 3 ? 95 : strokeCount === 2 ? 85 : totalPoints > 100 ? 80 : 55;
+
+  const overall = Math.round((detailScore * 0.3) + (complexScore * 0.3) + (coverageScore * 0.2) + (strokeScore * 0.2));
+  const score = Math.max(40, Math.min(92, overall)); // clamp 40-92
+
+  const feedback = score >= 80
+    ? 'Excellent effort! Your strokes show great detail.'
+    : score >= 60
+    ? 'Good attempt! Keep refining your strokes.'
+    : 'Nice try! Try to cover the full character shape.';
+
   return {
     score,
-    feedback: score >= 70 ? 'Good effort! Keep practicing to perfect it.' : 'Try to add more detail to your strokes!',
+    feedback,
     breakdown: [
-      { label: 'Stroke count', score: strokeCount >= 2 ? 90 : 50, note: `${strokeCount} stroke(s) detected` },
-      { label: 'Stroke detail', score: totalPoints >= 30 ? 85 : 55, note: `${totalPoints} points traced` },
-      { label: 'Coverage', score: score, note: 'Based on stroke analysis' },
-      { label: 'Effort', score: Math.min(100, strokeCount * 25 + 25), note: 'Keep going!' },
+      { label: 'Stroke detail',   score: detailScore,   note: `${totalPoints} points traced` },
+      { label: 'Complexity',      score: complexScore,  note: `${directionChanges} direction changes` },
+      { label: 'Coverage',        score: coverageScore, note: `${Math.round(width)}×${Math.round(height)}px area` },
+      { label: 'Stroke flow',     score: strokeScore,   note: strokeCount === 1 && totalPoints > 100 ? 'Smooth single stroke' : `${strokeCount} stroke(s)` },
     ],
   };
 }
