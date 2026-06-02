@@ -286,38 +286,50 @@ export async function generateWritingChallenge(level: string, language: string):
 export type HandwritingEvaluation = {
   score: number; // 0 to 100
   feedback: string;
+  breakdown?: { label: string; score: number; note: string }[];
 };
 
-export async function evaluateHandwriting(svgPaths: string, expectedTranslation: string, language: string): Promise<HandwritingEvaluation> {
+export async function evaluateHandwriting(
+  imageBase64: string,
+  expectedTranslation: string,
+  language: string
+): Promise<HandwritingEvaluation> {
   if (!hasApiKey()) throw new Error('API Key is missing');
 
-  const model = genAI.getGenerativeModel({ 
-    model: 'gemini-flash-latest',
-    generationConfig: { responseMimeType: "application/json" }
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    generationConfig: { responseMimeType: 'application/json' },
   });
 
-  const prompt = `You are an AI handwriting evaluator for the language ${language}. 
-  The user was asked to write the word: "${expectedTranslation}".
-  I am providing you with the raw SVG path (d attribute values) of their drawn strokes.
-  
-  SVG Data:
-  ${svgPaths}
-  
-  Based on the complexity and shape of these strokes, make an educated guess about how accurately they wrote "${expectedTranslation}".
-  Since you are evaluating raw coordinates instead of an image, focus on stroke count, length, and relative positioning. 
-  If the SVG is very simple or completely empty, give a low score. If it has multiple complex strokes typical of ${language}, give a reasonable score.
-  
-  Output a JSON object with:
-  'score': A number from 0 to 100 representing accuracy.
-  'feedback': A short, encouraging 1-sentence feedback message in English.`;
+  const prompt = `You are an expert handwriting evaluator for the ${language} language.
+The student was asked to write: "${expectedTranslation}" in ${language} script.
+The image provided is their actual handwritten attempt on a white canvas.
+
+Analyse the handwriting carefully and return a JSON object with:
+1. "score": Overall accuracy from 0-100.
+2. "feedback": One short encouraging sentence in English summarising the result.
+3. "breakdown": An array of EXACTLY 4 objects, each representing a specific visual component of the character. Each object must have:
+   - "label": Short name of the component (e.g. "Curve shape", "Stroke count", "Proportions", "Stroke alignment").
+   - "score": A number from 0-100 for that component.
+   - "note": One very short note (max 6 words) about that component.
+
+Be accurate and honest. If the writing is clearly wrong, give a low score.`;
 
   try {
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent([
+      prompt,
+      {
+        inlineData: {
+          mimeType: 'image/png',
+          data: imageBase64,
+        },
+      },
+    ]);
     const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(text) as HandwritingEvaluation;
   } catch (error) {
-    console.warn("Error evaluating handwriting:", error);
-    return { score: 0, feedback: "Couldn't evaluate the strokes, keep practicing!" };
+    console.warn('Error evaluating handwriting:', error);
+    return { score: 0, feedback: "Couldn't evaluate — keep practicing!", breakdown: [] };
   }
 }
 
