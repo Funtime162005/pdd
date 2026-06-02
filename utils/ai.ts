@@ -403,24 +403,21 @@ export async function evaluateHandwriting(
     return { score: 0, feedback: 'Nothing drawn yet!', breakdown: [] };
   }
 
-  // Plain text mode — much faster than JSON mode
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const totalPoints = paths.flat().length;
-    const strokeSummary = normalizePaths(paths);
 
-    const prompt = `You are a ${language} script handwriting evaluator.
+    const prompt = `You are a strict and expert ${language} script handwriting evaluator.
 The student was asked to write: "${expectedTranslation}" in ${language}.
-Strokes: ${paths.length}, Points: ${totalPoints}
-Normalized coordinates: ${strokeSummary}
+Analyze the provided image of their handwriting.
 
-Does this match "${expectedTranslation}"? Score strictly:
-- Clearly correct: 72-90
-- Partially correct: 45-68
-- Wrong character: 15-40
+Does this match "${expectedTranslation}"? Score strictly out of 100 based on legibility and correct stroke shapes:
+- Clearly correct and perfectly legible: 75-98
+- Partially correct but messy/sloppy: 45-74
+- Wrong character, illegible, or completely off: 10-44
 
-Reply in this exact format:
+Reply in this exact format (no markdown, just plain text):
 SCORE: <number>
 FEEDBACK: <one short sentence>
 STROKE_ACCURACY: <number>
@@ -428,7 +425,14 @@ CHARACTER_SHAPE: <number>
 PROPORTIONS: <number>
 OVERALL_FORM: <number>`;
 
-    const result = await withTimeout(model.generateContent(prompt), 15000);
+    const imagePart = {
+      inlineData: {
+        data: imageBase64,
+        mimeType: "image/png"
+      }
+    };
+
+    const result = await withTimeout(model.generateContent([prompt, imagePart]), 15000);
     const text = result.response.text().trim();
 
     const getNum = (label: string) => {
@@ -442,7 +446,7 @@ OVERALL_FORM: <number>`;
 
     const score = getNum('SCORE');
     const feedback = getStr('FEEDBACK') || (score >= 70 ? 'Great effort!' : 'Keep practicing!');
-    console.log('✅ AI scored:', score, 'for', expectedTranslation);
+    console.log('✅ Vision AI scored:', score, 'for', expectedTranslation);
 
     return {
       score,
@@ -450,7 +454,7 @@ OVERALL_FORM: <number>`;
       breakdown: [
         { label: 'Stroke accuracy', score: getNum('STROKE_ACCURACY'), note: `${paths.length} stroke(s)` },
         { label: 'Character shape', score: getNum('CHARACTER_SHAPE'), note: score >= 70 ? 'Matches well' : 'Needs work' },
-        { label: 'Proportions',     score: getNum('PROPORTIONS'),     note: `${totalPoints} pts` },
+        { label: 'Proportions',     score: getNum('PROPORTIONS'),     note: score >= 70 ? 'Well spaced' : 'A bit squished' },
         { label: 'Overall form',    score: getNum('OVERALL_FORM'),    note: score >= 70 ? 'Good form' : 'Keep tracing' },
       ],
     };
