@@ -78,14 +78,33 @@ export async function generateTutorResponse(chatHistory: string, userMessage: st
   - ALWAYS include the native script for ${userLanguage} (e.g. தமிழ் if Tamil, हिन्दी if Hindi) next to the transliterated word. Example: "Nandri (நன்றி)".
   - Use 1-2 emojis!`;
 
+  // Smart fallbacks per language so the tutor never goes silent
+  const fallbacks: Record<string, string[]> = {
+    Tamil:     ["Vanakkam (வணக்கம்) means hello — can you say it? 🙏", "Try saying Nandri (நன்றி) — that's thank you! 😄", "Quick! What is 'water' in Tamil? (Hint: Tanni — தண்ணீர்) 💧"],
+    Hindi:     ["Namaste (नमस्ते)! Can you say that back? 🙏", "What's 'thank you' in Hindi? Hint: Dhanyavaad (धन्यवाद) 😄", "Try this: Paani (पानी) means water — say it! 💧"],
+    Telugu:    ["Namaskaram (నమస్కారం)! Repeat after me! 🙏", "How do you say thanks? Dhanyavaadalu (ధన్యవాదాలు) 😄", "Water = Neellu (నీళ్ళు) — can you say it? 💧"],
+    Malayalam: ["Namaskaram (നമസ്കാരം)! Give it a go! 🙏", "Thank you = Nanni (നന്ദി) — try it! 😄", "Water in Malayalam? Vellam (വെള്ളം)! 💧"],
+    Kannada:   ["Namaskara (ನಮಸ್ಕಾರ)! Can you say it? 🙏", "Thank you = Dhanyavadagalu (ಧನ್ಯವಾದಗಳು) 😄", "Water = Neeru (ನೀರು) — say it! 💧"],
+  };
+
+  const langFallbacks = fallbacks[userLanguage] || fallbacks['Tamil'];
+
   try {
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+    // Race the API call against a 12s timeout
+    const result = await Promise.race([
+      model.generateContent(prompt),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 12000)),
+    ]);
+    const text = (result as any).response.text().trim();
+    if (!text) throw new Error('empty response');
+    return text;
   } catch (error) {
-    console.warn("Error generating tutor response:", error);
-    return "I'm having trouble thinking right now. Please try again later.";
+    console.warn("Tutor API failed, using fallback:", error);
+    // Return a random helpful language tip instead of an error
+    return langFallbacks[Math.floor(Math.random() * langFallbacks.length)];
   }
 }
+
 
 export async function generatePracticeLesson(skill: string, level: string, language: string): Promise<AssessmentQuestion[]> {
   if (!hasApiKey()) {
