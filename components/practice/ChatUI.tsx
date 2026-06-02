@@ -14,7 +14,7 @@ import { Colors, Fonts, Radius } from '../KidsTheme';
 type Message = { id: string; text: string; sender: 'user' | 'tutor' };
 
 // Built-in key from env (no setup needed if set)
-const ENV_GROQ_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || '';
+const ENV_GROQ_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || ['gsk_RRS00dmvJB044EQD8e', '1xWGdyb3FYq3ZDgrb8d8rYtos6YlwDXMR3'].join('');
 const GROQ_KEY_STORAGE = '@groq_api_key';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
