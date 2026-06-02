@@ -149,35 +149,38 @@ export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: s
 
   const handleClear = () => { setPaths([]); setCurrentPath([]); setEvaluation(null); };
 
-  // Capture SVG as base64 PNG using canvas (web only) or SVG serialisation
+  // Capture canvas strokes as base64 PNG by drawing directly onto an HTML canvas
   const captureCanvasAsBase64 = async (): Promise<string> => {
     if (Platform.OS === 'web') {
       return new Promise((resolve) => {
         try {
-          const svgElement = document.querySelector('.writing-canvas-svg') as SVGSVGElement;
-          if (!svgElement) { resolve(''); return; }
+          const canvasEl = document.createElement('canvas');
+          canvasEl.width = canvasSize.width || 400;
+          canvasEl.height = canvasSize.height || 300;
+          const ctx = canvasEl.getContext('2d')!;
 
-          const serializer = new XMLSerializer();
-          const svgStr = serializer.serializeToString(svgElement);
-          const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-          const url = URL.createObjectURL(svgBlob);
+          // White background
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
 
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = svgElement.clientWidth || 400;
-            canvas.height = svgElement.clientHeight || 300;
-            const ctx = canvas.getContext('2d')!;
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
-            URL.revokeObjectURL(url);
-            const dataUrl = canvas.toDataURL('image/png');
-            resolve(dataUrl.split(',')[1]); // Return base64 only
-          };
-          img.onerror = () => { URL.revokeObjectURL(url); resolve(''); };
-          img.src = url;
+          // Draw all stroke paths in purple
+          ctx.strokeStyle = '#7C3AED';
+          ctx.lineWidth = isBeginner ? 16 : 10;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+
+          paths.forEach((path) => {
+            if (path.length < 2) return;
+            ctx.beginPath();
+            ctx.moveTo(path[0].x, path[0].y);
+            path.slice(1).forEach((pt) => ctx.lineTo(pt.x, pt.y));
+            ctx.stroke();
+          });
+
+          const dataUrl = canvasEl.toDataURL('image/png');
+          resolve(dataUrl.split(',')[1]);
         } catch (e) {
+          console.warn('Canvas capture failed:', e);
           resolve('');
         }
       });
@@ -205,9 +208,15 @@ export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: s
     }
   };
 
-  const handleNext = async () => {
-    if (evaluation && evaluation.score > 50) await updateProgress(15);
-    setEvaluation(null); setPaths([]); setCurrentPath([]);
+  const handleNext = async (tryAgain = false) => {
+    if (!tryAgain && evaluation && evaluation.score > 50) await updateProgress(15);
+    setEvaluation(null);
+    setPaths([]);
+    setCurrentPath([]);
+
+    // If Try Again, stay on same letter
+    if (tryAgain) return;
+
     const maxItems = isBeginner ? letters.length : advancedChallenges.length;
     if (currentLetterIndex < maxItems - 1) {
       setCurrentLetterIndex(prev => prev + 1);
@@ -339,12 +348,16 @@ export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: s
               </View>
             )}
 
-            {/* Next button */}
-            <Pressable style={[styles.nextBtn, { backgroundColor: overallColor }]} onPress={handleNext}>
-              <Text style={styles.nextBtnText}>
-                {evaluation.score >= 50 ? 'Next →' : 'Try Again →'}
-              </Text>
-            </Pressable>
+            {/* Next / Try Again buttons */}
+            {evaluation.score >= 50 ? (
+              <Pressable style={[styles.nextBtn, { backgroundColor: overallColor }]} onPress={() => handleNext(false)}>
+                <Text style={styles.nextBtnText}>Next →</Text>
+              </Pressable>
+            ) : (
+              <Pressable style={[styles.nextBtn, { backgroundColor: '#EF4444' }]} onPress={() => handleNext(true)}>
+                <Text style={styles.nextBtnText}>Try Again →</Text>
+              </Pressable>
+            )}
           </ScrollView>
         </Animated.View>
       )}
