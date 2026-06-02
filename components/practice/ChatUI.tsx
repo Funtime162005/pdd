@@ -13,8 +13,11 @@ import { Colors, Fonts, Radius } from '../KidsTheme';
 
 type Message = { id: string; text: string; sender: 'user' | 'tutor' };
 
+// Built-in key from env (no setup needed if set)
+const ENV_GROQ_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || '';
 const GROQ_KEY_STORAGE = '@groq_api_key';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
 
 // Smart language fallbacks in case Groq also fails
 const FALLBACKS: Record<string, string[]> = {
@@ -124,7 +127,7 @@ export default function ChatUI({ skill = 'communication', title, tier }: { skill
   const scrollRef = useRef<ScrollView>(null);
   const lang = (user?.learningLanguage || 'tamil').toLowerCase();
 
-  const [groqKey, setGroqKey] = useState<string | null>(null);
+  const [groqKey, setGroqKey] = useState<string | null>(ENV_GROQ_KEY || null);
   const [keyLoaded, setKeyLoaded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { id: '1', text: `Hey ${user?.name || 'boss'}! 👋 Ready to drop some ${user?.learningLanguage || 'Tamil'} knowledge? Let's go! 🚀`, sender: 'tutor' },
