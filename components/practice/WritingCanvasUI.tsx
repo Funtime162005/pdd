@@ -208,8 +208,13 @@ export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: s
     }
   };
 
-  const handleNext = async (tryAgain = false) => {
-    if (!tryAgain && evaluation && evaluation.score > 50) await updateProgress(15);
+  const handleNext = (tryAgain = false) => {
+    // Award XP in background — don't await, so UI responds instantly
+    if (!tryAgain && evaluation && evaluation.score > 50) {
+      updateProgress(15).catch(() => {}); // fire and forget
+    }
+
+    // Immediately clear canvas and result
     setEvaluation(null);
     setPaths([]);
     setCurrentPath([]);
