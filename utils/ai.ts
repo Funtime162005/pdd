@@ -284,63 +284,79 @@ export async function generateWritingChallenge(level: string, language: string):
 }
 
 export type HandwritingEvaluation = {
-  score: number; // 0 to 100
+  score: number;
   feedback: string;
   breakdown?: { label: string; score: number; note: string }[];
 };
 
-// Smart fallback: analyse stroke geometry when vision API is unavailable
-function strokeBasedScore(paths: { x: number; y: number }[][]): HandwritingEvaluation {
+// Normalize paths to 0-100 grid for consistent analysis
+function normalizePaths(paths: { x: number; y: number }[][]): string {
+  const all = paths.flat();
+  if (all.length === 0) return '';
+  const minX = Math.min(...all.map(p => p.x));
+  const maxX = Math.max(...all.map(p => p.x));
+  const minY = Math.min(...all.map(p => p.y));
+  const maxY = Math.max(...all.map(p => p.y));
+  const rangeX = maxX - minX || 1;
+  const rangeY = maxY - minY || 1;
+
+  return paths.map((path, i) => {
+    // Sample every 5th point to keep prompt short
+    const sampled = path.filter((_, idx) => idx % 5 === 0);
+    const pts = sampled.map(p =>
+      `(${Math.round(((p.x - minX) / rangeX) * 100)},${Math.round(((p.y - minY) / rangeY) * 100)})`
+    ).join(' ');
+    return `Stroke ${i + 1}: ${pts}`;
+  }).join('\n');
+}
+
+// Text-based AI evaluation using stroke coordinates (works without vision)
+async function textBasedEvaluation(
+  paths: { x: number; y: number }[][],
+  expectedTranslation: string,
+  language: string
+): Promise<HandwritingEvaluation> {
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-flash-lite-latest',
+    generationConfig: { responseMimeType: 'application/json' },
+  });
+
+  const normalizedStrokes = normalizePaths(paths);
   const strokeCount = paths.length;
-  const totalPoints = paths.reduce((sum, p) => sum + p.length, 0);
+  const totalPoints = paths.reduce((s, p) => s + p.length, 0);
 
-  // Count direction changes (complexity indicator)
-  let directionChanges = 0;
-  for (const path of paths) {
-    for (let i = 2; i < path.length; i++) {
-      const dx1 = path[i - 1].x - path[i - 2].x;
-      const dy1 = path[i - 1].y - path[i - 2].y;
-      const dx2 = path[i].x - path[i - 1].x;
-      const dy2 = path[i].y - path[i - 1].y;
-      const dot = dx1 * dx2 + dy1 * dy2;
-      if (dot < 0) directionChanges++;
-    }
-  }
+  const prompt = `You are an expert in ${language} script handwriting analysis.
+The student was asked to write the ${language} character: "${expectedTranslation}"
 
-  // Bounding box coverage
-  const allPoints = paths.flat();
-  if (allPoints.length === 0) return { score: 0, feedback: 'Nothing drawn yet!', breakdown: [] };
-  const xs = allPoints.map(p => p.x);
-  const ys = allPoints.map(p => p.y);
-  const width = Math.max(...xs) - Math.min(...xs);
-  const height = Math.max(...ys) - Math.min(...ys);
-  const area = width * height;
+Their drawing is described by normalized stroke coordinates (0-100 grid):
+${normalizedStrokes}
 
-  // Score components
-  const detailScore   = Math.min(100, Math.round((totalPoints / 150) * 100));       // 150 pts = full marks
-  const complexScore  = Math.min(100, Math.round((directionChanges / 40) * 100));   // 40 changes = full marks
-  const coverageScore = Math.min(100, Math.round((area / 20000) * 100));            // reasonable area
-  const strokeScore   = strokeCount >= 3 ? 95 : strokeCount === 2 ? 85 : totalPoints > 100 ? 80 : 55;
+Total strokes: ${strokeCount}, Total points: ${totalPoints}
 
-  const overall = Math.round((detailScore * 0.3) + (complexScore * 0.3) + (coverageScore * 0.2) + (strokeScore * 0.2));
-  const score = Math.max(40, Math.min(92, overall)); // clamp 40-92
+Based on the stroke paths above, determine if this looks like "${expectedTranslation}".
+Consider: stroke count, direction, shape, and coverage.
 
-  const feedback = score >= 80
-    ? 'Excellent effort! Your strokes show great detail.'
-    : score >= 60
-    ? 'Good attempt! Keep refining your strokes.'
-    : 'Nice try! Try to cover the full character shape.';
+Important rules:
+- If the strokes clearly form "${expectedTranslation}", score 70-95
+- If the strokes are close but imperfect, score 45-70
+- If the strokes don't match "${expectedTranslation}" at all, score 10-40
+- Never give 0 unless nothing was drawn
 
-  return {
-    score,
-    feedback,
-    breakdown: [
-      { label: 'Stroke detail',   score: detailScore,   note: `${totalPoints} points traced` },
-      { label: 'Complexity',      score: complexScore,  note: `${directionChanges} direction changes` },
-      { label: 'Coverage',        score: coverageScore, note: `${Math.round(width)}×${Math.round(height)}px area` },
-      { label: 'Stroke flow',     score: strokeScore,   note: strokeCount === 1 && totalPoints > 100 ? 'Smooth single stroke' : `${strokeCount} stroke(s)` },
-    ],
-  };
+Return JSON:
+{
+  "score": <number 0-100>,
+  "feedback": "<one short encouraging sentence>",
+  "breakdown": [
+    {"label": "Stroke accuracy", "score": <0-100>, "note": "<max 6 words>"},
+    {"label": "Character shape", "score": <0-100>, "note": "<max 6 words>"},
+    {"label": "Proportions", "score": <0-100>, "note": "<max 6 words>"},
+    {"label": "Stroke flow", "score": <0-100>, "note": "<max 6 words>"}
+  ]
+}`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+  return JSON.parse(text) as HandwritingEvaluation;
 }
 
 export async function evaluateHandwriting(
@@ -351,43 +367,57 @@ export async function evaluateHandwriting(
 ): Promise<HandwritingEvaluation> {
   if (!hasApiKey()) throw new Error('API Key is missing');
 
-  // If no image captured, fall back to stroke analysis immediately
-  if (!imageBase64 || imageBase64.length < 100) {
-    console.warn('No valid image captured, using stroke fallback');
-    return paths ? strokeBasedScore(paths) : { score: 70, feedback: 'Good try! Keep practicing.', breakdown: [] };
+  if (!paths || paths.length === 0) {
+    return { score: 0, feedback: 'Nothing drawn yet!', breakdown: [] };
   }
 
-  try {
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
-      generationConfig: { responseMimeType: 'application/json' },
-    });
+  // First try: Gemini Vision (most accurate)
+  if (imageBase64 && imageBase64.length > 100) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-1.5-flash',
+        generationConfig: { responseMimeType: 'application/json' },
+      });
 
-    const prompt = `You are an expert handwriting evaluator for the ${language} language.
+      const prompt = `You are an expert handwriting evaluator for the ${language} language.
 The student was asked to write: "${expectedTranslation}" in ${language} script.
-The image shows their handwritten attempt on a white canvas with purple strokes.
+The image shows their handwritten attempt (purple strokes on white canvas).
 
-Return a JSON object with:
-1. "score": Overall accuracy 0-100. If purple strokes are clearly visible and resemble the character, score 60+.
-2. "feedback": One short encouraging sentence in English.
-3. "breakdown": Array of EXACTLY 4 objects with keys "label" (string), "score" (0-100), "note" (max 6 words).
-   Use labels: "Curve shape", "Stroke count", "Proportions", "Overall form".
+Return JSON:
+{
+  "score": <0-100, be strict - wrong character = low score>,
+  "feedback": "<one short encouraging sentence>",
+  "breakdown": [
+    {"label": "Curve shape", "score": <0-100>, "note": "<max 6 words>"},
+    {"label": "Stroke count", "score": <0-100>, "note": "<max 6 words>"},
+    {"label": "Proportions", "score": <0-100>, "note": "<max 6 words>"},
+    {"label": "Overall form", "score": <0-100>, "note": "<max 6 words>"}
+  ]
+}`;
 
-IMPORTANT: If you can see any purple handwriting strokes, do NOT give 0. Give at least 50.`;
+      const result = await model.generateContent([
+        prompt,
+        { inlineData: { mimeType: 'image/png', data: imageBase64 } },
+      ]);
+      const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(text) as HandwritingEvaluation;
+      console.log('Vision API succeeded:', parsed.score);
+      return parsed;
+    } catch (e) {
+      console.warn('Vision API failed, trying text-based evaluation:', e);
+    }
+  }
 
-    const result = await model.generateContent([
-      prompt,
-      { inlineData: { mimeType: 'image/png', data: imageBase64 } },
-    ]);
-
-    const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(text) as HandwritingEvaluation;
-    // Safety: never return 0 if image was valid
-    if (parsed.score === 0) parsed.score = 45;
-    return parsed;
-  } catch (error) {
-    console.warn('Vision API failed, using stroke fallback:', error);
-    return paths ? strokeBasedScore(paths) : { score: 65, feedback: "Good effort! Keep practicing.", breakdown: [] };
+  // Second try: Text-based coordinate analysis (accurate, works without vision)
+  try {
+    return await textBasedEvaluation(paths, expectedTranslation, language);
+  } catch (e) {
+    console.warn('Text evaluation also failed:', e);
+    return {
+      score: 50,
+      feedback: "Couldn't evaluate right now — keep practicing!",
+      breakdown: [],
+    };
   }
 }
 
