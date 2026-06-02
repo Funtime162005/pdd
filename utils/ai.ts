@@ -384,26 +384,57 @@ export async function evaluateHandwriting(
     return { score: 0, feedback: 'Nothing drawn yet!', breakdown: [] };
   }
 
-  // Try text-based AI with strict 10s timeout
+  // Plain text mode — much faster than JSON mode
   try {
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-flash-lite-latest',
-      generationConfig: { responseMimeType: 'application/json' },
-    });
+    const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
 
+    const totalPoints = paths.flat().length;
     const strokeSummary = normalizePaths(paths);
-    const prompt = `You are a ${language} handwriting expert. The student wrote: "${expectedTranslation}".
-Stroke data (normalized 0-100 grid): ${strokeSummary}
-Strokes: ${paths.length}, Points: ${paths.flat().length}
 
-Score if this matches "${expectedTranslation}". Wrong character = 10-35. Partial = 40-65. Correct = 70-92.
-Return JSON only: {"score":<0-100>,"feedback":"<10 words max>","breakdown":[{"label":"Stroke accuracy","score":<n>,"note":"<5 words>"},{"label":"Character shape","score":<n>,"note":"<5 words>"},{"label":"Proportions","score":<n>,"note":"<5 words>"},{"label":"Overall form","score":<n>,"note":"<5 words>"}]}`;
+    const prompt = `You are a ${language} script handwriting evaluator.
+The student was asked to write: "${expectedTranslation}" in ${language}.
+Strokes: ${paths.length}, Points: ${totalPoints}
+Normalized coordinates: ${strokeSummary}
 
-    const result = await withTimeout(model.generateContent(prompt), 10000);
-    const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(text) as HandwritingEvaluation;
-    console.log('✅ AI scored:', parsed.score);
-    return parsed;
+Does this match "${expectedTranslation}"? Score strictly:
+- Clearly correct: 72-90
+- Partially correct: 45-68
+- Wrong character: 15-40
+
+Reply in this exact format:
+SCORE: <number>
+FEEDBACK: <one short sentence>
+STROKE_ACCURACY: <number>
+CHARACTER_SHAPE: <number>
+PROPORTIONS: <number>
+OVERALL_FORM: <number>`;
+
+    const result = await withTimeout(model.generateContent(prompt), 15000);
+    const text = result.response.text().trim();
+
+    const getNum = (label: string) => {
+      const m = text.match(new RegExp(`${label}:\\s*(\\d+)`));
+      return m ? Math.min(100, parseInt(m[1])) : 50;
+    };
+    const getStr = (label: string) => {
+      const m = text.match(new RegExp(`${label}:\\s*(.+)`));
+      return m ? m[1].trim() : '';
+    };
+
+    const score = getNum('SCORE');
+    const feedback = getStr('FEEDBACK') || (score >= 70 ? 'Great effort!' : 'Keep practicing!');
+    console.log('✅ AI scored:', score, 'for', expectedTranslation);
+
+    return {
+      score,
+      feedback,
+      breakdown: [
+        { label: 'Stroke accuracy', score: getNum('STROKE_ACCURACY'), note: `${paths.length} stroke(s)` },
+        { label: 'Character shape', score: getNum('CHARACTER_SHAPE'), note: score >= 70 ? 'Matches well' : 'Needs work' },
+        { label: 'Proportions',     score: getNum('PROPORTIONS'),     note: `${totalPoints} pts` },
+        { label: 'Overall form',    score: getNum('OVERALL_FORM'),    note: score >= 70 ? 'Good form' : 'Keep tracing' },
+      ],
+    };
   } catch (e) {
     console.warn('AI evaluation timed out or failed, using local scorer:', e);
     return localGeometricScore(paths, expectedTranslation);
