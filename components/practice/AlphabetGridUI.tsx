@@ -260,8 +260,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   card: {
-    width: isDesktop ? 100 : 80,
-    height: isDesktop ? 100 : 80,
+    minWidth: isDesktop ? 100 : 80,
+    minHeight: isDesktop ? 100 : 80,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#fff',
     borderRadius: 20,
     justifyContent: 'center',
@@ -280,9 +282,10 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.05 }],
   },
   cardText: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: '700',
     color: '#334155',
+    textAlign: 'center',
   },
   cardTextActive: {
     color: '#0EA5E9',
