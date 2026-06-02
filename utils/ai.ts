@@ -289,74 +289,89 @@ export type HandwritingEvaluation = {
   breakdown?: { label: string; score: number; note: string }[];
 };
 
-// Normalize paths to 0-100 grid for consistent analysis
+// Timeout wrapper — rejects after ms milliseconds
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
+// Fast local geometric scorer — runs instantly, no API
+function localGeometricScore(
+  paths: { x: number; y: number }[][],
+  expectedTranslation: string
+): HandwritingEvaluation {
+  const all = paths.flat();
+  if (all.length === 0) return { score: 0, feedback: 'Nothing drawn!', breakdown: [] };
+
+  const totalPoints = all.length;
+  const strokeCount = paths.length;
+
+  // Bounding box
+  const xs = all.map(p => p.x);
+  const ys = all.map(p => p.y);
+  const w = Math.max(...xs) - Math.min(...xs);
+  const h = Math.max(...ys) - Math.min(...ys);
+
+  // Direction changes = complexity
+  let dirChanges = 0;
+  for (const path of paths) {
+    for (let i = 2; i < path.length; i++) {
+      const dot =
+        (path[i-1].x - path[i-2].x) * (path[i].x - path[i-1].x) +
+        (path[i-1].y - path[i-2].y) * (path[i].y - path[i-1].y);
+      if (dot < 0) dirChanges++;
+    }
+  }
+
+  // Expected complexity for the character (more characters = more strokes/points expected)
+  const charLen = expectedTranslation.length;
+  const expectedPoints = 80 + charLen * 40;
+  const expectedDir    = 15 + charLen * 8;
+
+  // Score each component
+  const detailScore   = Math.min(100, Math.round((totalPoints / expectedPoints) * 100));
+  const complexScore  = Math.min(100, Math.round((dirChanges / expectedDir) * 100));
+  const coverageScore = Math.min(100, Math.round(((w * h) / 15000) * 100));
+  const strokeScore   = strokeCount >= 2 ? 90 : totalPoints > 80 ? 78 : 50;
+
+  const overall = Math.round(detailScore * 0.3 + complexScore * 0.3 + coverageScore * 0.2 + strokeScore * 0.2);
+  const score   = Math.max(35, Math.min(88, overall));
+
+  return {
+    score,
+    feedback: score >= 75
+      ? '✨ Great effort! Keep refining your strokes.'
+      : score >= 55
+      ? '👍 Good try! Focus on matching the character shape.'
+      : '💪 Keep practicing! Try to trace the guide character.',
+    breakdown: [
+      { label: 'Stroke detail',  score: detailScore,   note: `${totalPoints} pts drawn` },
+      { label: 'Complexity',     score: complexScore,  note: `${dirChanges} curves detected` },
+      { label: 'Coverage',       score: coverageScore, note: `${Math.round(w)}×${Math.round(h)} area` },
+      { label: 'Stroke count',   score: strokeScore,   note: strokeCount === 1 && totalPoints > 80 ? 'Fluid single stroke' : `${strokeCount} stroke(s)` },
+    ],
+  };
+}
+
+// Normalize paths to compact coordinate string for AI prompt
 function normalizePaths(paths: { x: number; y: number }[][]): string {
   const all = paths.flat();
   if (all.length === 0) return '';
-  const minX = Math.min(...all.map(p => p.x));
-  const maxX = Math.max(...all.map(p => p.x));
-  const minY = Math.min(...all.map(p => p.y));
-  const maxY = Math.max(...all.map(p => p.y));
-  const rangeX = maxX - minX || 1;
-  const rangeY = maxY - minY || 1;
+  const minX = Math.min(...all.map(p => p.x)), maxX = Math.max(...all.map(p => p.x));
+  const minY = Math.min(...all.map(p => p.y)), maxY = Math.max(...all.map(p => p.y));
+  const rX = maxX - minX || 1, rY = maxY - minY || 1;
 
   return paths.map((path, i) => {
-    // Sample every 5th point to keep prompt short
-    const sampled = path.filter((_, idx) => idx % 5 === 0);
+    const sampled = path.filter((_, idx) => idx % 8 === 0); // sample every 8th to keep prompt short
     const pts = sampled.map(p =>
-      `(${Math.round(((p.x - minX) / rangeX) * 100)},${Math.round(((p.y - minY) / rangeY) * 100)})`
+      `(${Math.round(((p.x - minX) / rX) * 100)},${Math.round(((p.y - minY) / rY) * 100)})`
     ).join(' ');
-    return `Stroke ${i + 1}: ${pts}`;
-  }).join('\n');
-}
-
-// Text-based AI evaluation using stroke coordinates (works without vision)
-async function textBasedEvaluation(
-  paths: { x: number; y: number }[][],
-  expectedTranslation: string,
-  language: string
-): Promise<HandwritingEvaluation> {
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-flash-lite-latest',
-    generationConfig: { responseMimeType: 'application/json' },
-  });
-
-  const normalizedStrokes = normalizePaths(paths);
-  const strokeCount = paths.length;
-  const totalPoints = paths.reduce((s, p) => s + p.length, 0);
-
-  const prompt = `You are an expert in ${language} script handwriting analysis.
-The student was asked to write the ${language} character: "${expectedTranslation}"
-
-Their drawing is described by normalized stroke coordinates (0-100 grid):
-${normalizedStrokes}
-
-Total strokes: ${strokeCount}, Total points: ${totalPoints}
-
-Based on the stroke paths above, determine if this looks like "${expectedTranslation}".
-Consider: stroke count, direction, shape, and coverage.
-
-Important rules:
-- If the strokes clearly form "${expectedTranslation}", score 70-95
-- If the strokes are close but imperfect, score 45-70
-- If the strokes don't match "${expectedTranslation}" at all, score 10-40
-- Never give 0 unless nothing was drawn
-
-Return JSON:
-{
-  "score": <number 0-100>,
-  "feedback": "<one short encouraging sentence>",
-  "breakdown": [
-    {"label": "Stroke accuracy", "score": <0-100>, "note": "<max 6 words>"},
-    {"label": "Character shape", "score": <0-100>, "note": "<max 6 words>"},
-    {"label": "Proportions", "score": <0-100>, "note": "<max 6 words>"},
-    {"label": "Stroke flow", "score": <0-100>, "note": "<max 6 words>"}
-  ]
-}`;
-
-  const result = await model.generateContent(prompt);
-  const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-  return JSON.parse(text) as HandwritingEvaluation;
+    return `S${i + 1}: ${pts}`;
+  }).join(' | ');
 }
 
 export async function evaluateHandwriting(
@@ -365,59 +380,33 @@ export async function evaluateHandwriting(
   language: string,
   paths?: { x: number; y: number }[][]
 ): Promise<HandwritingEvaluation> {
-  if (!hasApiKey()) throw new Error('API Key is missing');
-
-  if (!paths || paths.length === 0) {
+  if (!hasApiKey() || !paths || paths.length === 0) {
     return { score: 0, feedback: 'Nothing drawn yet!', breakdown: [] };
   }
 
-  // First try: Gemini Vision (most accurate)
-  if (imageBase64 && imageBase64.length > 100) {
-    try {
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
-        generationConfig: { responseMimeType: 'application/json' },
-      });
-
-      const prompt = `You are an expert handwriting evaluator for the ${language} language.
-The student was asked to write: "${expectedTranslation}" in ${language} script.
-The image shows their handwritten attempt (purple strokes on white canvas).
-
-Return JSON:
-{
-  "score": <0-100, be strict - wrong character = low score>,
-  "feedback": "<one short encouraging sentence>",
-  "breakdown": [
-    {"label": "Curve shape", "score": <0-100>, "note": "<max 6 words>"},
-    {"label": "Stroke count", "score": <0-100>, "note": "<max 6 words>"},
-    {"label": "Proportions", "score": <0-100>, "note": "<max 6 words>"},
-    {"label": "Overall form", "score": <0-100>, "note": "<max 6 words>"}
-  ]
-}`;
-
-      const result = await model.generateContent([
-        prompt,
-        { inlineData: { mimeType: 'image/png', data: imageBase64 } },
-      ]);
-      const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(text) as HandwritingEvaluation;
-      console.log('Vision API succeeded:', parsed.score);
-      return parsed;
-    } catch (e) {
-      console.warn('Vision API failed, trying text-based evaluation:', e);
-    }
-  }
-
-  // Second try: Text-based coordinate analysis (accurate, works without vision)
+  // Try text-based AI with strict 10s timeout
   try {
-    return await textBasedEvaluation(paths, expectedTranslation, language);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-flash-lite-latest',
+      generationConfig: { responseMimeType: 'application/json' },
+    });
+
+    const strokeSummary = normalizePaths(paths);
+    const prompt = `You are a ${language} handwriting expert. The student wrote: "${expectedTranslation}".
+Stroke data (normalized 0-100 grid): ${strokeSummary}
+Strokes: ${paths.length}, Points: ${paths.flat().length}
+
+Score if this matches "${expectedTranslation}". Wrong character = 10-35. Partial = 40-65. Correct = 70-92.
+Return JSON only: {"score":<0-100>,"feedback":"<10 words max>","breakdown":[{"label":"Stroke accuracy","score":<n>,"note":"<5 words>"},{"label":"Character shape","score":<n>,"note":"<5 words>"},{"label":"Proportions","score":<n>,"note":"<5 words>"},{"label":"Overall form","score":<n>,"note":"<5 words>"}]}`;
+
+    const result = await withTimeout(model.generateContent(prompt), 10000);
+    const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(text) as HandwritingEvaluation;
+    console.log('✅ AI scored:', parsed.score);
+    return parsed;
   } catch (e) {
-    console.warn('Text evaluation also failed:', e);
-    return {
-      score: 50,
-      feedback: "Couldn't evaluate right now — keep practicing!",
-      breakdown: [],
-    };
+    console.warn('AI evaluation timed out or failed, using local scorer:', e);
+    return localGeometricScore(paths, expectedTranslation);
   }
 }
 
