@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, Pressable, Platform,
   PanResponder, ActivityIndicator, ScrollView
 } from 'react-native';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import Animated, {
   FadeInDown, FadeInUp, SlideInDown,
@@ -249,11 +249,19 @@ export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: s
         style={styles.canvasContainer}
         onLayout={(e) => setCanvasSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
       >
-        {isBeginner && (
-          <View style={styles.referenceContainer}>
-            <Text style={styles.referenceLetter}>{letters[currentLetterIndex]}</Text>
-          </View>
-        )}
+        {/* Reference letter — rendered as plain text behind SVG */}
+        <View style={styles.referenceContainer} pointerEvents="none">
+          <Text style={[
+            styles.referenceLetter,
+            !isBeginner && { fontSize: 90 }
+          ]}>
+            {isBeginner
+              ? letters[currentLetterIndex]
+              : (advancedChallenges[currentLetterIndex]?.expectedTranslation || '')}
+          </Text>
+        </View>
+
+        {/* Transparent SVG drawing layer on top */}
         <View style={styles.drawingArea} {...panResponder.panHandlers}>
           <Svg
             height="100%"
@@ -262,13 +270,6 @@ export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: s
             // @ts-ignore — className for web capture
             className="writing-canvas-svg"
           >
-            <Rect x="0" y="0" width="100%" height="100%" fill="white" />
-            {isBeginner && (
-              <Path
-                d={`M ${canvasSize.width * 0.5} ${canvasSize.height * 0.15} L ${canvasSize.width * 0.5} ${canvasSize.height * 0.85}`}
-                stroke="#F3F4F6" strokeWidth={1} strokeDasharray="6,6"
-              />
-            )}
             {allPaths.map((path, index) => (
               <Path
                 key={index}
@@ -375,10 +376,24 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' ? { boxShadow: '0px 8px 24px rgba(0,0,0,0.06)' } : { ...Shadow.card }),
     marginBottom: 16,
   },
-  referenceContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
-  referenceLetter: { fontSize: 200, fontFamily: Fonts.heading, color: '#F3F4F6', opacity: 0.6 },
+  referenceContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 0,
+  },
+  referenceLetter: {
+    fontSize: 200,
+    fontFamily: Fonts.heading,
+    color: '#C0C0D0',
+    opacity: 0.45,
+    textAlign: 'center',
+    userSelect: 'none' as any,
+  },
   drawingArea: {
     ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+    backgroundColor: 'transparent',
     ...(Platform.OS === 'web' ? { touchAction: 'none' } : {}),
   },
 
