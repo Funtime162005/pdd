@@ -327,8 +327,8 @@ export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: s
 
       {/* Evaluation Results */}
       {evaluation && (
-        <Animated.View entering={SlideInDown.springify()} style={styles.evalCard}>
-          <ScrollView showsVerticalScrollIndicator={false}>
+        <Animated.View entering={SlideInDown.springify()} style={[styles.evalCard, { flex: 1, marginBottom: 20 }]}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
             {/* Score header */}
             <View style={styles.scoreHeader}>
               <Text style={styles.scoreEmoji}>{getScoreEmoji(evaluation.score)}</Text>
@@ -342,7 +342,7 @@ export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: s
 
             {/* Expected word */}
             <View style={[styles.targetBadge, { borderColor: Colors.purple }]}>
-              <Text style={styles.targetLabel}>Target Character</Text>
+              <Text style={styles.targetLabel}>Target</Text>
               <Text style={styles.targetChar}>{currentTarget}</Text>
             </View>
 
