@@ -1,7 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { View, StyleSheet, Platform } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import QuizUI from '../../components/practice/QuizUI';
 import SentenceBuilder from '../../components/practice/SentenceBuilder';
 import Flashcards from '../../components/practice/Flashcards';
@@ -15,7 +16,6 @@ import { useAuth } from '../../context/AuthContext';
 
 export default function PracticeScreen() {
   const { skill, tier: requestedTier } = useLocalSearchParams<{ skill: string, tier: string }>();
-  const router = useRouter();
   const { user } = useAuth();
 
   // Use the explicitly requested tier, fallback to user's global level
@@ -29,57 +29,172 @@ export default function PracticeScreen() {
   // Format the skill slug into a readable title
   const title = skill ? skill.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Practice';
 
-  const [selectedLevelNum, setSelectedLevelNum] = React.useState<number | null>(null);
-  const [selectedTier, setSelectedTier] = React.useState<string | null>(null);
+  const [selectedLevelNum, setSelectedLevelNum] = useState<number | null>(null);
+  const [selectedTier, setSelectedTier] = useState<string | null>(null);
 
-  // Polymorphic router logic
-  let PracticeComponent;
+  const handleBack = () => {
+    setSelectedLevelNum(null);
+    setSelectedTier(null);
+  };
 
-  // --- Dynamic 4-Pillar Routing ---
-  if (skill === 'foundations') {
-    if (selectedLevelNum && selectedTier) {
-      if (selectedTier === 'Beginner') {
-        PracticeComponent = <AlphabetGridUI skill={skill} title={`Level ${selectedLevelNum}`} selectedLevelNum={selectedLevelNum} onBack={() => { setSelectedLevelNum(null); setSelectedTier(null); }} />;
-      } else {
-        PracticeComponent = <SentenceBuilder skill={skill} title={`Level ${selectedLevelNum}`} selectedLevelNum={selectedLevelNum} selectedTier={selectedTier} onBack={() => { setSelectedLevelNum(null); setSelectedTier(null); }} />;
+  const handleNextLevel = async () => {
+    if (selectedLevelNum) {
+      const finishedNum = selectedLevelNum;
+      const key = `@game_${skill || 'general'}_${selectedTier || 'Beginner'}_completed`;
+      const saved = await AsyncStorage.getItem(key);
+      const prevMax = saved ? parseInt(saved, 10) : 0;
+      if (finishedNum > prevMax) {
+        await AsyncStorage.setItem(key, finishedNum.toString());
       }
+      setSelectedLevelNum(finishedNum + 1);
     } else {
-      PracticeComponent = <LevelsListUI currentLevelStr={user?.level} initialTab={tier} onSelectLevel={(num, selectedMapTier) => { setSelectedLevelNum(num); setSelectedTier(selectedMapTier); }} />;
+      setSelectedLevelNum(2);
     }
-  } else if (skill === 'writing') {
-    PracticeComponent = <WritingCanvasUI title="Writing Practice" tier={tier} />;
-  } else if (skill === 'vocabulary') {
-    PracticeComponent = <Flashcards skill={skill} title="Vocabulary Challenges" tier={tier} />;
-  } else if (skill === 'communication') {
-    PracticeComponent = <ChatUI title="AI Tutor Conversation" tier={tier} />;
-  } else if (skill === 'pronunciation') {
-    PracticeComponent = <VoiceRecordingUI title="Pronunciation Training" tier={tier} />;
-  } else if (skill === 'reading') {
-    PracticeComponent = <ReadingUI title="Reading Comprehension" tier={tier} />;
-  } else if (skill === 'assessment') {
-    PracticeComponent = <QuizUI skill="mini-quiz" title="Module Assessment" tier={tier} />;
-  }
-  // --- Legacy routing (for direct links) ---
-  else if (skill?.includes('sentence') || skill?.includes('fluency') || skill?.includes('translation')) {
-    PracticeComponent = <SentenceBuilder skill={skill} title={title} />;
-  } else if (skill?.includes('alphabet')) {
-    PracticeComponent = <AlphabetGridUI skill={skill} title={title} />;
-  } else if (skill?.includes('greetings') || skill?.includes('tutor') || skill?.includes('culture') || skill?.includes('communication')) {
-    PracticeComponent = <ChatUI skill={skill} title={title} />;
-  } else if (skill?.includes('vocabulary')) {
-    PracticeComponent = <Flashcards skill={skill} title={title} />;
-  } else if (skill === 'reading') {
-    PracticeComponent = <ReadingUI skill={skill} title={title} />;
-  } else {
-    PracticeComponent = <QuizUI skill={skill} title={title} />;
-  }
+  };
+
+  const handleSelectLevel = (num: number, selectedMapTier: string) => {
+    setSelectedLevelNum(num);
+    setSelectedTier(selectedMapTier);
+  };
+
+  const renderContent = () => {
+    // 1. Foundations (Alphabet Grid or Sentence Builder)
+    if (skill === 'foundations') {
+      if (selectedLevelNum && selectedTier) {
+        if (selectedTier === 'Beginner') {
+          return (
+            <AlphabetGridUI 
+              key={`foundations-grid-${selectedLevelNum}`}
+              skill={skill} 
+              title={`Level ${selectedLevelNum}`} 
+              selectedLevelNum={selectedLevelNum} 
+              onBack={handleBack}
+              onNextLevel={handleNextLevel}
+            />
+          );
+        } else {
+          return (
+            <SentenceBuilder 
+              key={`foundations-builder-${selectedLevelNum}`}
+              skill={skill} 
+              title={`Level ${selectedLevelNum}`} 
+              selectedLevelNum={selectedLevelNum} 
+              selectedTier={selectedTier} 
+              onBack={handleBack}
+            />
+          );
+        }
+      }
+      return <LevelsListUI gameKey={skill || 'foundations'} gameTitle={title} currentLevelStr={user?.level} initialTab={tier} onSelectLevel={handleSelectLevel} />;
+    }
+
+    // 2. Writing (Handwriting Canvas)
+    if (skill === 'writing') {
+      if (selectedLevelNum && selectedTier) {
+        return (
+          <WritingCanvasUI 
+            key={`writing-${selectedLevelNum}`}
+            title={`Writing - Level ${selectedLevelNum}`} 
+            tier={selectedTier} 
+            selectedLevelNum={selectedLevelNum}
+            onBack={handleBack}
+            onNextLevel={handleNextLevel}
+          />
+        );
+      }
+      return <LevelsListUI gameKey={skill || 'writing'} gameTitle={title} currentLevelStr={user?.level} initialTab={tier} onSelectLevel={handleSelectLevel} />;
+    }
+
+    // 3. Vocabulary (Flashcards)
+    if (skill === 'vocabulary' || skill?.includes('vocabulary')) {
+      if (selectedLevelNum && selectedTier) {
+        return (
+          <Flashcards 
+            key={`vocab-${selectedLevelNum}`}
+            skill="vocabulary" 
+            title={`Vocabulary - Level ${selectedLevelNum}`} 
+            tier={selectedTier} 
+            selectedLevelNum={selectedLevelNum}
+            onBack={handleBack}
+            onNextLevel={handleNextLevel}
+          />
+        );
+      }
+      return <LevelsListUI gameKey={skill || 'vocabulary'} gameTitle={title} currentLevelStr={user?.level} initialTab={tier} onSelectLevel={handleSelectLevel} />;
+    }
+
+    // 4. Reading (Reading Stories)
+    if (skill === 'reading') {
+      if (selectedLevelNum && selectedTier) {
+        return (
+          <ReadingUI 
+            key={`reading-${selectedLevelNum}`}
+            skill={skill} 
+            title={`Reading - Level ${selectedLevelNum}`} 
+            tier={selectedTier} 
+            selectedLevelNum={selectedLevelNum}
+            onBack={handleBack}
+            onNextLevel={handleNextLevel}
+          />
+        );
+      }
+      return <LevelsListUI gameKey={skill || 'reading'} gameTitle={title} currentLevelStr={user?.level} initialTab={tier} onSelectLevel={handleSelectLevel} />;
+    }
+
+    // 5. Communication / Chat
+    if (skill === 'communication' || skill?.includes('greetings') || skill?.includes('tutor') || skill?.includes('culture')) {
+      return <ChatUI skill={skill || 'communication'} title={title || "AI Tutor Conversation"} tier={tier} />;
+    }
+
+    // 6. Pronunciation / Voice
+    if (skill === 'pronunciation') {
+      if (selectedLevelNum && selectedTier) {
+        return (
+          <VoiceRecordingUI 
+            key={`pronunciation-${selectedLevelNum}`}
+            title={`Pronunciation - Level ${selectedLevelNum}`} 
+            tier={selectedTier} 
+            selectedLevelNum={selectedLevelNum}
+            onBack={handleBack}
+            onNextLevel={handleNextLevel}
+          />
+        );
+      }
+      return <LevelsListUI gameKey={skill || 'pronunciation'} gameTitle={title} currentLevelStr={user?.level} initialTab={tier} onSelectLevel={handleSelectLevel} />;
+    }
+
+    // 7. Assessment / Quiz
+    if (skill === 'assessment') {
+      if (selectedLevelNum && selectedTier) {
+        return (
+          <QuizUI 
+            key={`assessment-${selectedLevelNum}`}
+            skill="mini-quiz" 
+            title={`Assessment - Level ${selectedLevelNum}`} 
+            tier={selectedTier} 
+            selectedLevelNum={selectedLevelNum}
+            onBack={handleBack}
+            onNextLevel={handleNextLevel}
+          />
+        );
+      }
+      return <LevelsListUI gameKey={skill || 'assessment'} gameTitle={title} currentLevelStr={user?.level} initialTab={tier} onSelectLevel={handleSelectLevel} />;
+    }
+
+    // 8. Sentence / Fluency / Translation
+    if (skill?.includes('sentence') || skill?.includes('fluency') || skill?.includes('translation')) {
+      return <SentenceBuilder skill={skill} title={title} />;
+    }
+
+    // Fallback Quiz
+    return <QuizUI skill={skill || 'quiz'} title={title} />;
+  };
 
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#ECFDF5', '#F0FDF4']} style={StyleSheet.absoluteFill} />
-      
       <View style={styles.content}>
-        {PracticeComponent}
+        {renderContent()}
       </View>
     </View>
   );

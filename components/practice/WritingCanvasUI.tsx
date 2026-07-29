@@ -1,27 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, Platform,
-  PanResponder, ActivityIndicator, ScrollView
+  View, Text, StyleSheet, Pressable, Platform, ActivityIndicator, ScrollView
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import Animated, {
-  FadeInDown, FadeInUp, SlideInDown,
+  FadeInDown, SlideInDown,
   useSharedValue, useAnimatedStyle, withTiming, withDelay
 } from 'react-native-reanimated';
 import { Colors, Fonts, Radius, Shadow } from '../KidsTheme';
 import { useAuth } from '../../context/AuthContext';
 import ConfettiCannon from 'react-native-confetti-cannon';
-import { generateWritingChallenge, evaluateHandwriting, WritingChallenge, HandwritingEvaluation } from '../../utils/ai';
-import { LinearGradient } from 'expo-linear-gradient';
-
-const ALPHABETS: Record<string, string[]> = {
-  tamil: ['அ', 'ஆ', 'இ', 'ஈ', 'உ', 'ஊ'],
-  hindi: ['अ', 'आ', 'इ', 'ई', 'उ', 'ऊ'],
-  telugu: ['అ', 'ఆ', 'ఇ', 'ఈ', 'ఉ', 'ఊ'],
-  malayalam: ['അ', 'ആ', 'ഇ', 'ഈ', 'ഉ', 'ഊ'],
-  kannada: ['ಅ', 'ಆ', 'ಇ', 'ಈ', 'ಉ', 'ಊ'],
-};
+import { evaluateHandwriting, HandwritingEvaluation, getWritingLevelItems } from '../../utils/ai';
 
 type Point = { x: number; y: number };
 
@@ -76,22 +68,28 @@ const breakdownStyles = StyleSheet.create({
   note: { fontFamily: Fonts.bodyReg, fontSize: 12, color: '#6B7280', marginTop: 3 },
 });
 
-export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: string, tier?: string }) {
+type Props = {
+  title: string;
+  tier?: string;
+  selectedLevelNum?: number;
+  onBack?: () => void;
+  onNextLevel?: () => void;
+};
+
+export default function WritingCanvasUI({ title, tier = 'Beginner', selectedLevelNum = 1, onBack, onNextLevel }: Props) {
   const router = useRouter();
-  const { user, updateProgress } = useAuth();
+  const { user, updateProgress, completeLevel } = useAuth();
 
   const language = user?.learningLanguage || 'tamil';
-  const isBeginner = tier === 'Beginner';
-  const letters = ALPHABETS[language] || ALPHABETS['tamil'];
 
   const [currentLetterIndex, setCurrentLetterIndex] = useState(0);
-  const [advancedChallenges, setAdvancedChallenges] = useState<WritingChallenge[]>([]);
-  const [loadingChallenges, setLoadingChallenges] = useState(!isBeginner);
+  const currentNum = selectedLevelNum || (currentLetterIndex + 1);
+  const levelInfo = getWritingLevelItems(currentNum, language, tier);
+  const currentTarget = levelInfo.target;
 
   const [paths, setPaths] = useState<Point[][]>([]);
   const [currentPath, setCurrentPath] = useState<Point[]>([]);
   const currentPathRef = useRef<Point[]>([]);
-  const svgRef = useRef<any>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [evaluation, setEvaluation] = useState<HandwritingEvaluation | null>(null);
@@ -99,46 +97,46 @@ export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: s
   // Canvas size tracking for web capture
   const [canvasSize, setCanvasSize] = useState({ width: 400, height: 300 });
 
-  useEffect(() => {
-    if (!isBeginner) loadChallenges();
-  }, [tier, language]);
+  const isDrawingRef = useRef(false);
 
-  const loadChallenges = async () => {
-    try {
-      setLoadingChallenges(true);
-      const challenges = await generateWritingChallenge(tier, language);
-      setAdvancedChallenges(challenges);
-    } catch (e) {
-      setAdvancedChallenges([{ englishWord: 'apple', expectedTranslation: 'ஆப்பிள்' }]);
-    } finally {
-      setLoadingChallenges(false);
+  const getCanvasCoords = (e: any) => {
+    if (e.nativeEvent && typeof e.nativeEvent.locationX === 'number' && e.nativeEvent.locationX > 0) {
+      return { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
     }
+    const target = e.currentTarget;
+    if (target && target.getBoundingClientRect) {
+      const rect = target.getBoundingClientRect();
+      const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+      const clientY = e.clientY ?? (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+    return { x: e.nativeEvent?.x || 0, y: e.nativeEvent?.y || 0 };
   };
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        const { locationX, locationY } = evt.nativeEvent;
-        currentPathRef.current = [{ x: locationX, y: locationY }];
-        setCurrentPath(currentPathRef.current);
-      },
-      onPanResponderMove: (evt) => {
-        const { locationX, locationY } = evt.nativeEvent;
-        currentPathRef.current = [...currentPathRef.current, { x: locationX, y: locationY }];
-        setCurrentPath(currentPathRef.current);
-      },
-      onPanResponderRelease: () => {
-        const fp = [...currentPathRef.current];
-        if (fp.length > 0) { setPaths(prev => [...prev, fp]); currentPathRef.current = []; setCurrentPath([]); }
-      },
-      onPanResponderTerminate: () => {
-        const fp = [...currentPathRef.current];
-        if (fp.length > 0) { setPaths(prev => [...prev, fp]); currentPathRef.current = []; setCurrentPath([]); }
-      },
-    })
-  ).current;
+  const handleStart = (e: any) => {
+    isDrawingRef.current = true;
+    const pt = getCanvasCoords(e);
+    currentPathRef.current = [pt];
+    setCurrentPath([pt]);
+  };
+
+  const handleMove = (e: any) => {
+    if (!isDrawingRef.current) return;
+    const pt = getCanvasCoords(e);
+    currentPathRef.current.push(pt);
+    setCurrentPath([...currentPathRef.current]);
+  };
+
+  const handleEnd = () => {
+    if (!isDrawingRef.current) return;
+    isDrawingRef.current = false;
+    const fp = [...currentPathRef.current];
+    if (fp.length > 0) {
+      setPaths(prev => [...prev, fp]);
+    }
+    currentPathRef.current = [];
+    setCurrentPath([]);
+  };
 
   const allPaths = [...paths, ...(currentPath.length > 0 ? [currentPath] : [])];
 
@@ -165,7 +163,7 @@ export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: s
 
           // Draw all stroke paths in purple
           ctx.strokeStyle = '#7C3AED';
-          ctx.lineWidth = isBeginner ? 16 : 10;
+          ctx.lineWidth = 14;
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
 
@@ -193,183 +191,241 @@ export default function WritingCanvasUI({ title, tier = 'Beginner' }: { title: s
     setIsSubmitting(true);
 
     try {
-      const expectedWord = isBeginner
-        ? letters[currentLetterIndex]
-        : advancedChallenges[currentLetterIndex]?.expectedTranslation || '';
-
       const base64 = await captureCanvasAsBase64();
-      const evalResult = await evaluateHandwriting(base64, expectedWord, language, paths);
+      const evalResult = await evaluateHandwriting(base64, currentTarget, language, paths);
       setEvaluation(evalResult);
     } catch (e) {
       console.error(e);
-      setEvaluation({ score: 75, feedback: "Looks good! Keep practicing.", breakdown: [] });
+      setEvaluation({ score: 85, feedback: `Great job tracing ${currentTarget}!`, breakdown: [] });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleNext = (tryAgain = false) => {
-    // Award XP in background — don't await, so UI responds instantly
-    if (!tryAgain && evaluation && evaluation.score > 50) {
-      updateProgress(15).catch(() => {}); // fire and forget
-    }
+  const isAdvancingRef = useRef(false);
 
-    // Immediately clear canvas and result
-    setEvaluation(null);
-    setPaths([]);
-    setCurrentPath([]);
+  const handleNext = async (tryAgain = false) => {
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
 
-    // If Try Again, stay on same letter
-    if (tryAgain) return;
+    try {
+      if (!tryAgain && evaluation && evaluation.score > 50) {
+        updateProgress(15).catch(() => {});
+      }
 
-    const maxItems = isBeginner ? letters.length : advancedChallenges.length;
-    if (currentLetterIndex < maxItems - 1) {
-      setCurrentLetterIndex(prev => prev + 1);
-    } else {
-      router.canGoBack() ? router.back() : router.replace('/(tabs)');
+      if (!tryAgain) {
+        const storageKey = `@game_writing_${tier}_completed`;
+        const savedVal = await AsyncStorage.getItem(storageKey);
+        const prevMax = savedVal ? parseInt(savedVal, 10) : 0;
+        if (currentNum > prevMax) {
+          await AsyncStorage.setItem(storageKey, currentNum.toString());
+        }
+        await completeLevel(currentNum);
+        if (onNextLevel) {
+          setEvaluation(null);
+          setPaths([]);
+          setCurrentPath([]);
+          onNextLevel();
+          return;
+        }
+      }
+
+      setEvaluation(null);
+      setPaths([]);
+      setCurrentPath([]);
+
+      if (tryAgain) return;
+
+      if (currentLetterIndex < 999) {
+        setCurrentLetterIndex(prev => prev + 1);
+      } else {
+        if (onBack) onBack();
+        else if (router.canGoBack()) router.back();
+        else router.replace('/(tabs)');
+      }
+    } finally {
+      setTimeout(() => {
+        isAdvancingRef.current = false;
+      }, 1000);
     }
   };
 
-  if (loadingChallenges) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={Colors.purple} />
-        <Text style={{ marginTop: 12, fontFamily: Fonts.bodySemi, color: Colors.textMid }}>Loading challenges...</Text>
-      </View>
-    );
-  }
-
-  const currentTarget = isBeginner ? letters[currentLetterIndex] : advancedChallenges[currentLetterIndex]?.expectedTranslation;
   const overallColor = evaluation ? getScoreColor(evaluation.score) : Colors.green;
 
+  const webCanvasRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && webCanvasRef.current) {
+      const canvas = webCanvasRef.current;
+      canvas.width = canvasSize.width || 500;
+      canvas.height = canvasSize.height || 300;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = Colors.purple;
+        ctx.lineWidth = 14;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        allPaths.forEach((path) => {
+          if (path.length === 0) return;
+          ctx.beginPath();
+          ctx.moveTo(path[0].x, path[0].y);
+          for (let i = 1; i < path.length; i++) {
+            ctx.lineTo(path[i].x, path[i].y);
+          }
+          ctx.stroke();
+        });
+      }
+    }
+  }, [allPaths, canvasSize]);
+
   return (
-    <Animated.View entering={FadeInDown.springify()} style={styles.container}>
-      {evaluation && evaluation.score >= 80 && <ConfettiCannon count={100} origin={{ x: 200, y: 0 }} fadeOut />}
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={styles.container}>
+        {evaluation && evaluation.score >= 80 && <ConfettiCannon count={100} origin={{ x: 200, y: 0 }} fadeOut />}
 
-      <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
-        {isBeginner ? (
-          <Text style={styles.subtitle}>Trace the letter below!</Text>
-        ) : (
-          <View style={styles.challengeBox}>
-            <Text style={styles.challengeLabel}>Write the {language} word for:</Text>
-            <Text style={styles.challengeWord}>{advancedChallenges[currentLetterIndex]?.englishWord}</Text>
+        <View style={styles.headerBar}>
+          {onBack ? (
+            <Pressable style={styles.backBtnHeader} onPress={onBack}>
+              <Text style={styles.backBtnHeaderText}>← Back</Text>
+            </Pressable>
+          ) : (
+            <View style={{ width: 75 }} />
+          )}
+
+          <View style={styles.headerCenter}>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.subtitle}>{levelInfo.prompt}</Text>
           </View>
-        )}
-      </View>
 
-      {/* Canvas */}
-      <View
-        style={styles.canvasContainer}
-        onLayout={(e) => setCanvasSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
-      >
-        {/* Reference letter — rendered as plain text behind SVG */}
-        {isBeginner && (
+          <View style={{ width: 75 }} />
+        </View>
+
+        {/* Canvas */}
+        <View
+          style={styles.canvasContainer}
+          onLayout={(e) => setCanvasSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+          onPointerDown={handleStart}
+          onPointerMove={handleMove}
+          onPointerUp={handleEnd}
+          onPointerLeave={handleEnd}
+          onTouchStart={handleStart}
+          onTouchMove={handleMove}
+          onTouchEnd={handleEnd}
+        >
+          {/* Reference letter — rendered as plain text behind SVG */}
           <View style={[styles.referenceContainer, { paddingHorizontal: 20 }]} pointerEvents="none">
             <Text 
               adjustsFontSizeToFit 
               numberOfLines={1}
               style={[
                 styles.referenceLetter,
-                !isBeginner && { fontSize: 130 }
+                currentTarget.length > 2 && { fontSize: 100 }
               ]}>
-              {letters[currentLetterIndex]}
+              {currentTarget}
             </Text>
+          </View>
+
+          {/* Drawing layer */}
+          {Platform.OS === 'web' ? (
+            <canvas
+              ref={webCanvasRef}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none',
+              }}
+            />
+          ) : (
+            <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+              {allPaths.map((path, pathIdx) => (
+                <Path
+                  key={pathIdx}
+                  d={generateSvgPath(path)}
+                  stroke={Colors.purple}
+                  strokeWidth={14}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              ))}
+            </Svg>
+          )}
+        </View>
+
+        {/* Controls */}
+        {!evaluation && (
+          <View style={styles.controls}>
+            <Pressable style={styles.clearBtn} onPress={handleClear} disabled={isSubmitting}>
+              <Text style={styles.clearBtnText}>🗑️ Clear</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.submitBtn, (isSubmitting || paths.length === 0) && { opacity: 0.6 }]}
+              onPress={handleSubmit}
+              disabled={isSubmitting || paths.length === 0}
+            >
+              {isSubmitting ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <ActivityIndicator color="#FFF" size="small" />
+                  <Text style={styles.submitBtnText}>Analysing...</Text>
+                </View>
+              ) : (
+                <Text style={styles.submitBtnText}>Check It! ✓</Text>
+              )}
+            </Pressable>
           </View>
         )}
 
-        {/* Transparent SVG drawing layer on top */}
-        <View style={styles.drawingArea} {...panResponder.panHandlers}>
-          <Svg
-            height="100%"
-            width="100%"
-            style={{ position: 'absolute' }}
-            // @ts-ignore — className for web capture
-            className="writing-canvas-svg"
-          >
-            {allPaths.map((path, index) => (
-              <Path
-                key={index}
-                d={generateSvgPath(path)}
-                stroke={Colors.purple}
-                strokeWidth={isBeginner ? 16 : 10}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-              />
-            ))}
-          </Svg>
-        </View>
+        {/* Evaluation Results */}
+        {evaluation && (
+          <Animated.View entering={SlideInDown.springify()} style={[styles.evalCard, { flex: 1, marginBottom: 20 }]}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+              {/* Score header */}
+              <View style={styles.scoreHeader}>
+                <Text style={styles.scoreEmoji}>{getScoreEmoji(evaluation.score)}</Text>
+                <View>
+                  <Text style={[styles.evalScore, { color: overallColor }]}>
+                    {evaluation.score}% Accuracy
+                  </Text>
+                  <Text style={styles.evalFeedback}>{evaluation.feedback}</Text>
+                </View>
+              </View>
+
+              {/* Expected word */}
+              <View style={[styles.targetBadge, { borderColor: Colors.purple }]}>
+                <Text style={styles.targetLabel}>Target</Text>
+                <Text style={styles.targetChar}>{currentTarget}</Text>
+              </View>
+
+              {/* Breakdown bars */}
+              {evaluation.breakdown && evaluation.breakdown.length > 0 && (
+                <View style={styles.breakdownSection}>
+                  <Text style={styles.breakdownTitle}>📊 Detailed Analysis</Text>
+                  {evaluation.breakdown.map((item, i) => (
+                    <BreakdownBar key={i} item={item} delay={i * 150} />
+                  ))}
+                </View>
+              )}
+
+              {/* Next / Try Again buttons */}
+              {evaluation.score >= 50 ? (
+                <Pressable style={[styles.nextBtn, { backgroundColor: overallColor }]} onPress={() => handleNext(false)}>
+                  <Text style={styles.nextBtnText}>Next →</Text>
+                </Pressable>
+              ) : (
+                <Pressable style={[styles.nextBtn, { backgroundColor: '#EF4444' }]} onPress={() => handleNext(true)}>
+                  <Text style={styles.nextBtnText}>Try Again →</Text>
+                </Pressable>
+              )}
+            </ScrollView>
+          </Animated.View>
+        )}
       </View>
-
-      {/* Controls */}
-      {!evaluation && (
-        <View style={styles.controls}>
-          <Pressable style={styles.clearBtn} onPress={handleClear} disabled={isSubmitting}>
-            <Text style={styles.clearBtnText}>🗑️ Clear</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.submitBtn, (isSubmitting || paths.length === 0) && { opacity: 0.6 }]}
-            onPress={handleSubmit}
-            disabled={isSubmitting || paths.length === 0}
-          >
-            {isSubmitting ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <ActivityIndicator color="#FFF" size="small" />
-                <Text style={styles.submitBtnText}>Analysing...</Text>
-              </View>
-            ) : (
-              <Text style={styles.submitBtnText}>Check It! ✓</Text>
-            )}
-          </Pressable>
-        </View>
-      )}
-
-      {/* Evaluation Results */}
-      {evaluation && (
-        <Animated.View entering={SlideInDown.springify()} style={[styles.evalCard, { flex: 1, marginBottom: 20 }]}>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-            {/* Score header */}
-            <View style={styles.scoreHeader}>
-              <Text style={styles.scoreEmoji}>{getScoreEmoji(evaluation.score)}</Text>
-              <View>
-                <Text style={[styles.evalScore, { color: overallColor }]}>
-                  {evaluation.score}% Accuracy
-                </Text>
-                <Text style={styles.evalFeedback}>{evaluation.feedback}</Text>
-              </View>
-            </View>
-
-            {/* Expected word */}
-            <View style={[styles.targetBadge, { borderColor: Colors.purple }]}>
-              <Text style={styles.targetLabel}>Target</Text>
-              <Text style={styles.targetChar}>{currentTarget}</Text>
-            </View>
-
-            {/* Breakdown bars */}
-            {evaluation.breakdown && evaluation.breakdown.length > 0 && (
-              <View style={styles.breakdownSection}>
-                <Text style={styles.breakdownTitle}>📊 Detailed Analysis</Text>
-                {evaluation.breakdown.map((item, i) => (
-                  <BreakdownBar key={i} item={item} delay={i * 150} />
-                ))}
-              </View>
-            )}
-
-            {/* Next / Try Again buttons */}
-            {evaluation.score >= 50 ? (
-              <Pressable style={[styles.nextBtn, { backgroundColor: overallColor }]} onPress={() => handleNext(false)}>
-                <Text style={styles.nextBtnText}>Next →</Text>
-              </Pressable>
-            ) : (
-              <Pressable style={[styles.nextBtn, { backgroundColor: '#EF4444' }]} onPress={() => handleNext(true)}>
-                <Text style={styles.nextBtnText}>Try Again →</Text>
-              </Pressable>
-            )}
-          </ScrollView>
-        </Animated.View>
-      )}
-    </Animated.View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -378,9 +434,30 @@ const styles = StyleSheet.create({
     flex: 1, alignItems: 'center', width: '100%',
     maxWidth: 600, alignSelf: 'center',
   },
-  header: { alignItems: 'center', marginBottom: 16 },
-  title: { fontFamily: Fonts.heading, fontSize: 28, color: Colors.textDark },
-  subtitle: { fontFamily: Fonts.bodyReg, fontSize: 16, color: Colors.textMid, marginTop: 4 },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 16,
+  },
+  backBtnHeader: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#F3E8FF',
+    borderRadius: Radius.md,
+  },
+  backBtnHeaderText: {
+    fontFamily: Fonts.heading,
+    fontSize: 15,
+    color: Colors.purple,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  title: { fontFamily: Fonts.heading, fontSize: 26, color: Colors.textDark, textAlign: 'center' },
+  subtitle: { fontFamily: Fonts.bodyReg, fontSize: 15, color: Colors.textMid, marginTop: 2, textAlign: 'center' },
   challengeBox: {
     backgroundColor: Colors.purpleLight, paddingHorizontal: 24, paddingVertical: 12,
     borderRadius: Radius.lg, alignItems: 'center', marginTop: 10,
@@ -414,7 +491,7 @@ const styles = StyleSheet.create({
   drawingArea: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(255, 255, 255, 0.01)',
     ...(Platform.OS === 'web' ? { touchAction: 'none' } : {}),
   },
 

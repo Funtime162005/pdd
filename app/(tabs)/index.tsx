@@ -65,37 +65,31 @@ function IslandCard({ module, isDone, onPress, index }: any) {
   return (
     <Animated.View entering={FadeInRight.delay(150 + index * 120).springify()} style={animStyle}>
       <AnimatedPressable
-        style={[styles.islandCard, isDone && styles.islandCardDone,
-          { borderColor: isDone ? Colors.green : module.borderColor }]}
+        style={[styles.islandCard, { borderColor: module.borderColor }]}
         onPressIn={() => { scale.value = withSpring(0.95, { damping: 10 }); }}
         onPressOut={() => { scale.value = withSpring(1, { damping: 10 }); }}
         onPress={onPress}
       >
-        <LinearGradient colors={isDone ? ['#D1FAE5', '#A7F3D0'] : module.gradient}
+        <LinearGradient colors={module.gradient}
           style={[StyleSheet.absoluteFill, { borderRadius: Radius.xl }]} />
 
-        {/* Top row: icon + done badge */}
+        {/* Top row: icon + xp badge */}
         <View style={styles.islandTop}>
-          <View style={[styles.islandIconCircle, { backgroundColor: isDone ? Colors.green : module.iconBg }]}>
-            <Text style={styles.islandIcon}>{isDone ? '✅' : module.icon}</Text>
+          <View style={[styles.islandIconCircle, { backgroundColor: module.iconBg }]}>
+            <Text style={styles.islandIcon}>{module.icon}</Text>
           </View>
-          {isDone && (
-            <View style={styles.completedBadge}>
-              <Text style={styles.completedText}>Done! 🎉</Text>
-            </View>
-          )}
-          <View style={[styles.xpBubble, { backgroundColor: isDone ? Colors.green : module.xpColor }]}>
+          <View style={[styles.xpBubble, { backgroundColor: module.xpColor }]}>
             <Text style={styles.xpBubbleText}>{module.xp}</Text>
           </View>
         </View>
 
-        <Text style={[styles.islandTitle, isDone && { color: Colors.greenDark }]}>{module.title}</Text>
-        <Text style={[styles.islandDesc, isDone && { color: Colors.greenDark + 'CC' }]}>{module.desc}</Text>
+        <Text style={[styles.islandTitle, { color: '#FFFFFF' }]}>{module.title}</Text>
+        <Text style={[styles.islandDesc, { color: 'rgba(255,255,255,0.9)' }]}>{module.desc}</Text>
 
         <View style={styles.islandFooter}>
-          <Text style={styles.islandTime}>🕒 {module.duration}</Text>
-          <View style={[styles.islandPlayBtn, isDone ? { backgroundColor: Colors.green } : { backgroundColor: module.btnColor }]}>
-            <Text style={styles.islandPlayText}>{isDone ? 'Redo' : 'Go! →'}</Text>
+          <Text style={[styles.islandTime, { color: 'rgba(255,255,255,0.85)' }]}>🕒 {module.duration}</Text>
+          <View style={[styles.islandPlayBtn, { backgroundColor: 'rgba(255,255,255,0.25)', borderWidth: 1.5, borderColor: '#FFFFFF' }]}>
+            <Text style={[styles.islandPlayText, { color: '#FFFFFF', fontWeight: 'bold' }]}>Practice 🚀</Text>
           </View>
         </View>
       </AnimatedPressable>

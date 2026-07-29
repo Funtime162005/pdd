@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from 'expo-router';
@@ -9,10 +10,24 @@ import { generateFoundationsLesson, FoundationItem } from '../../utils/ai';
 const { width } = Dimensions.get('window');
 const isDesktop = width > 768;
 
-export default function AlphabetGridUI({ skill, title, selectedLevelNum, onBack }: { skill: string; title: string; selectedLevelNum?: number; onBack?: () => void }) {
-  const { user, updateProgress, completeModule } = useAuth();
+export default function AlphabetGridUI({ 
+  skill, 
+  title, 
+  selectedLevelNum, 
+  onBack,
+  onNextLevel 
+}: { 
+  skill: string; 
+  title: string; 
+  selectedLevelNum?: number; 
+  onBack?: () => void;
+  onNextLevel?: () => void;
+}) {
+  const { user, updateProgress, completeModule, completeLevel } = useAuth();
   const router = useRouter();
   const [leveledUp, setLeveledUp] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
+  const [completedLevelNum, setCompletedLevelNum] = useState<number>(selectedLevelNum || 1);
   const [newTier, setNewTier] = useState('');
   const lang = user?.learningLanguage || 'tamil';
   
@@ -23,7 +38,7 @@ export default function AlphabetGridUI({ skill, title, selectedLevelNum, onBack 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('');
   const [activeItem, setActiveItem] = useState<FoundationItem | null>(null);
-  const [progress, setProgress] = useState(0);
+  const [visitedIds, setVisitedIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     fetchLesson();
@@ -40,6 +55,7 @@ export default function AlphabetGridUI({ skill, title, selectedLevelNum, onBack 
           setActiveTab(uniqueCategories[0]);
         }
         setActiveItem(data[0]);
+        setVisitedIds(new Set([data[0].id]));
       }
     } catch (e) {
       console.warn("Failed to load alphabet grid", e);
@@ -50,22 +66,75 @@ export default function AlphabetGridUI({ skill, title, selectedLevelNum, onBack 
   const handlePress = (item: FoundationItem) => {
     setActiveItem(item);
     playAudio(item.text, lang);
-    setProgress(p => Math.min(100, p + 10)); // Arbitrary progress bump per tap
+    setVisitedIds(prev => new Set(prev).add(item.id));
   };
 
+  const isAdvancingRef = React.useRef(false);
+
   const completeLesson = async () => {
-    await updateProgress(20);
-    const result = await completeModule('foundations');
-    if (result?.leveledUp) {
-      setNewTier(result.newTier);
-      setLeveledUp(true);
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
+
+    try {
+      const currentNum = selectedLevelNum || 1;
+      setCompletedLevelNum(currentNum);
+      setTransitioning(true);
+
+      await updateProgress(20);
+      const storageKey = `@game_${skill || 'foundations'}_Beginner_completed`;
+      const savedVal = await AsyncStorage.getItem(storageKey);
+      const prevMax = savedVal ? parseInt(savedVal, 10) : 0;
+      if (currentNum > prevMax) {
+        await AsyncStorage.setItem(storageKey, currentNum.toString());
+      }
+      if (completeLevel) {
+        await completeLevel(currentNum);
+      }
+      const result = await completeModule('foundations');
+
+      if (result?.leveledUp) {
+        setNewTier(result.newTier);
+        setLeveledUp(true);
+        setTimeout(() => {
+          router.replace('/(tabs)');
+        }, 4000);
+      } else {
+        setTimeout(() => {
+          setVisitedIds(new Set());
+          setTransitioning(false);
+          if (onNextLevel) {
+            onNextLevel();
+          } else {
+            router.replace('/(tabs)');
+          }
+        }, 1500);
+      }
+    } finally {
       setTimeout(() => {
-        router.replace('/(tabs)');
-      }, 4000);
-    } else {
-      router.replace('/(tabs)');
+        isAdvancingRef.current = false;
+      }, 1000);
     }
   };
+
+  if (transitioning) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Animated.View entering={FadeInDown.springify()} style={{ alignItems: 'center' }}>
+          <Text style={{ fontSize: 64, marginBottom: 16 }}>🎉🌟</Text>
+          <Text style={{ fontSize: 32, fontWeight: '800', color: '#0EA5E9', marginBottom: 8, textAlign: 'center' }}>
+            Level {completedLevelNum} Completed!
+          </Text>
+          <Text style={{ fontSize: 18, color: '#16A34A', fontWeight: '700', marginBottom: 16 }}>
+            +20 XP Earned!
+          </Text>
+          <Text style={{ fontSize: 16, color: '#64748B' }}>
+            Loading Level {completedLevelNum + 1}...
+          </Text>
+          <ActivityIndicator size="large" color="#0EA5E9" style={{ marginTop: 20 }} />
+        </Animated.View>
+      </View>
+    );
+  }
 
   if (leveledUp) {
     return (
@@ -79,6 +148,7 @@ export default function AlphabetGridUI({ skill, title, selectedLevelNum, onBack 
     );
   }
 
+
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -90,6 +160,16 @@ export default function AlphabetGridUI({ skill, title, selectedLevelNum, onBack 
 
   const uniqueCategories = Array.from(new Set(items.map(i => i.category)));
   const filteredItems = items.filter(i => i.category === activeTab);
+  
+  const currentTabVisitedCount = filteredItems.filter(i => visitedIds.has(i.id)).length;
+  const isCurrentTabCompleted = filteredItems.length > 0 && currentTabVisitedCount === filteredItems.length;
+
+  const totalVisitedCount = items.filter(i => visitedIds.has(i.id)).length;
+  const isAllLessonsCompleted = items.length > 0 && totalVisitedCount === items.length;
+
+  const currentCategoryIdx = uniqueCategories.indexOf(activeTab);
+  const hasNextCategory = currentCategoryIdx >= 0 && currentCategoryIdx < uniqueCategories.length - 1;
+  const nextCategoryName = hasNextCategory ? uniqueCategories[currentCategoryIdx + 1] : null;
 
   return (
     <View style={styles.container}>
@@ -124,27 +204,63 @@ export default function AlphabetGridUI({ skill, title, selectedLevelNum, onBack 
           </Animated.View>
         )}
 
-        <View style={styles.grid}>
-          {filteredItems.map((item) => (
-            <Pressable
-              key={item.id}
-              style={[styles.card, activeItem?.id === item.id && styles.cardActive]}
-              onPress={() => handlePress(item)}
-            >
-              <Text style={[styles.cardText, activeItem?.id === item.id && styles.cardTextActive]}>
-                {item.text}
-              </Text>
-            </Pressable>
-          ))}
+        <View style={{ marginBottom: 16, alignItems: 'center' }}>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: isCurrentTabCompleted ? '#16A34A' : '#0EA5E9', backgroundColor: isCurrentTabCompleted ? '#DCFCE7' : '#E0F2FE', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }}>
+            {isCurrentTabCompleted 
+              ? `🎉 Completed ${activeTab}! (${currentTabVisitedCount}/${filteredItems.length})` 
+              : `Progress: ${currentTabVisitedCount} / ${filteredItems.length} cards in ${activeTab}`}
+          </Text>
         </View>
 
-        {progress >= 50 && (
-          <Animated.View entering={FadeInDown} style={{ marginTop: 40, alignItems: 'center' }}>
+        <View style={styles.grid}>
+          {filteredItems.map((item) => {
+            const isVisited = visitedIds.has(item.id);
+            const isActive = activeItem?.id === item.id;
+            return (
+              <Pressable
+                key={item.id}
+                style={[
+                  styles.card,
+                  isActive && styles.cardActive,
+                  isVisited && !isActive && { borderColor: '#86EFAC', backgroundColor: '#F0FDF4' }
+                ]}
+                onPress={() => handlePress(item)}
+              >
+                <Text style={[styles.cardText, isActive && styles.cardTextActive]}>
+                  {item.text}
+                </Text>
+                {isVisited && (
+                  <Text style={{ fontSize: 10, color: '#16A34A', position: 'absolute', top: 4, right: 6, fontWeight: '800' }}>✓</Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {isCurrentTabCompleted && hasNextCategory && nextCategoryName && (
+          <Animated.View entering={FadeInDown} style={{ marginTop: 32, alignItems: 'center' }}>
+            <Pressable 
+              style={[styles.completeBtn, { backgroundColor: '#0EA5E9', shadowColor: '#0EA5E9' }]} 
+              onPress={() => {
+                const nextItems = items.filter(i => i.category === nextCategoryName);
+                setActiveTab(nextCategoryName);
+                if (nextItems.length > 0) setActiveItem(nextItems[0]);
+              }}
+            >
+              <Text style={styles.completeBtnText}>Next Category: {nextCategoryName} →</Text>
+            </Pressable>
+          </Animated.View>
+        )}
+
+        {isAllLessonsCompleted && (
+          <Animated.View entering={FadeInDown} style={{ marginTop: 32, alignItems: 'center' }}>
             <Pressable style={styles.completeBtn} onPress={completeLesson}>
               <Text style={styles.completeBtnText}>Complete Lesson (+20 XP)</Text>
             </Pressable>
           </Animated.View>
         )}
+
+
       </ScrollView>
     </View>
   );

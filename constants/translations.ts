@@ -95,80 +95,188 @@ export const GAME_POOLS: Record<string, Array<{ text: string, audio: string }>> 
   ]
 };
 
-export const LISTEN_GAME_POOLS: Record<string, Array<{ target: string, options: string[], correct: number }>> = {
+// Dynamic Generator for 1000 Levels (5000 Unique Questions)
+const BASE_WORDS: Record<string, Array<{ native: string; english: string; emoji: string }>> = {
   tamil: [
-    { target: 'வணக்கம்', options: ['வணக்கம்', 'தண்ணீர்', 'உணவு', 'பள்ளி'], correct: 0 },
-    { target: 'நன்றி', options: ['தயவுசெய்து', 'நன்றி', 'மன்னிக்கவும்', 'ஆமாம்'], correct: 1 },
-    { target: 'தண்ணீர்', options: ['ஆப்பிள்', 'தண்ணீர்', 'வீடு', 'மரம்'], correct: 1 },
-    { target: 'உணவு', options: ['புத்தகம்', 'நண்பன்', 'உணவு', 'பணம்'], correct: 2 },
-    { target: 'பள்ளி', options: ['மருத்துவமனை', 'அலுவலகம்', 'கடை', 'பள்ளி'], correct: 3 },
+    { native: 'நாய்', english: 'Dog', emoji: '🐶' },
+    { native: 'பூனை', english: 'Cat', emoji: '🐱' },
+    { native: 'யானை', english: 'Elephant', emoji: '🐘' },
+    { native: 'சிங்கம்', english: 'Lion', emoji: '🦁' },
+    { native: 'பறவை', english: 'Bird', emoji: '🐦' },
+    { native: 'மீன்', english: 'Fish', emoji: '🐟' },
+    { native: 'குதிரை', english: 'Horse', emoji: '🐴' },
+    { native: 'கரடி', english: 'Bear', emoji: '🐻' },
+    { native: 'முயல்', english: 'Rabbit', emoji: '🐰' },
+    { native: 'குரங்கு', english: 'Monkey', emoji: '🐒' },
+    { native: 'பசு', english: 'Cow', emoji: '🐮' },
+    { native: 'ஆடு', english: 'Goat', emoji: '🐐' },
+    { native: 'மான்', english: 'Deer', emoji: '🦌' },
+    { native: 'புலி', english: 'Tiger', emoji: '🐅' },
+    { native: 'வாத்து', english: 'Duck', emoji: '🦆' },
+    { native: 'புத்தகம்', english: 'Book', emoji: '📚' },
+    { native: 'வீடு', english: 'House', emoji: '🏠' },
+    { native: 'பள்ளி', english: 'School', emoji: '🏫' },
+    { native: 'கார்', english: 'Car', emoji: '🚗' },
+    { native: 'மரம்', english: 'Tree', emoji: '🌳' },
+    { native: 'பூ', english: 'Flower', emoji: '🌺' },
+    { native: 'சூரியன்', english: 'Sun', emoji: '☀️' },
+    { native: 'சந்திரன்', english: 'Moon', emoji: '🌙' },
+    { native: 'பேனா', english: 'Pen', emoji: '🖊️' },
+    { native: 'ஆப்பிள்', english: 'Apple', emoji: '🍎' },
+    { native: 'வாழைப்பழம்', english: 'Banana', emoji: '🍌' },
+    { native: 'தண்ணீர்', english: 'Water', emoji: '💧' },
+    { native: 'ரயில்', english: 'Train', emoji: '🚆' },
+    { native: 'பணம்', english: 'Money', emoji: '💵' },
+    { native: 'கடிகாரம்', english: 'Clock', emoji: '⏰' },
+    { native: 'சைக்கிள்', english: 'Bicycle', emoji: '🚲' },
+    { native: 'விமானம்', english: 'Airplane', emoji: '✈️' },
+    { native: 'பந்து', english: 'Ball', emoji: '⚽' },
+    { native: 'நட்சத்திரம்', english: 'Star', emoji: '⭐' },
+    { native: 'மழை', english: 'Rain', emoji: '🌧️' },
+    { native: 'கடல்', english: 'Sea', emoji: '🌊' },
+    { native: 'மலை', english: 'Mountain', emoji: '⛰️' },
+    { native: 'பாட்டில்', english: 'Bottle', emoji: '🍼' },
+    { native: 'நாற்காலி', english: 'Chair', emoji: '🪑' },
+    { native: 'மேஜை', english: 'Table', emoji: '🪵' },
   ],
   hindi: [
-    { target: 'नमस्ते', options: ['नमस्ते', 'पानी', 'खाना', 'स्कूल'], correct: 0 },
-    { target: 'धन्यवाद', options: ['कृपया', 'धन्यवाद', 'माफ़ करें', 'हाँ'], correct: 1 },
-    { target: 'पानी', options: ['सेब', 'पानी', 'घर', 'पेड़'], correct: 1 },
-    { target: 'खाना', options: ['किताब', 'दोस्त', 'खाना', 'पैसे'], correct: 2 },
-    { target: 'स्कूल', options: ['अस्पताल', 'कार्यालय', 'दुकान', 'स्कूल'], correct: 3 },
-  ],
-  telugu: [
-    { target: 'నమస్కారం', options: ['నమస్కారం', 'నీరు', 'ఆహారం', 'పాఠశాల'], correct: 0 },
-    { target: 'ధన్యవాదాలు', options: ['దయచేసి', 'ధన్యవాదాలు', 'క్షమించండి', 'అవును'], correct: 1 },
-    { target: 'నీరు', options: ['ఆపిల్', 'నీరు', 'ఇల్లు', 'చెట్టు'], correct: 1 },
-    { target: 'ఆహారం', options: ['పుస్తకం', 'స్నేహితుడు', 'ఆహారం', 'డబ్బు'], correct: 2 },
-    { target: 'పాఠశాల', options: ['ఆసుపత్రి', 'కార్యాలయం', 'దుకాణం', 'పాఠశాల'], correct: 3 },
-  ],
-  malayalam: [
-    { target: 'നമസ്കാരം', options: ['നമസ്കാരം', 'വെള്ളം', 'ഭക്ഷണം', 'സ്കൂൾ'], correct: 0 },
-    { target: 'നന്ദി', options: ['ദയവായി', 'നന്ദി', 'ക്ഷമിക്കണം', 'അതെ'], correct: 1 },
-    { target: 'വെള്ളം', options: ['ആപ്പിൾ', 'വെള്ളം', 'വീട്', 'മരം'], correct: 1 },
-    { target: 'ഭക്ഷണം', options: ['പുസ്തകം', 'സുഹൃത്ത്', 'ഭക്ഷണം', 'പണം'], correct: 2 },
-    { target: 'സ്കൂൾ', options: ['ആശുപത്രി', 'ഓഫീസ്', 'കട', 'സ്കൂൾ'], correct: 3 },
-  ],
-  kannada: [
-    { target: 'ನಮಸ್ಕಾರ', options: ['ನಮಸ್ಕಾರ', 'ನೀರು', 'ಆಹಾರ', 'ಶಾಲೆ'], correct: 0 },
-    { target: 'ಧನ್ಯವಾದ', options: ['ದಯವಿಟ್ಟು', 'ಧನ್ಯವಾದ', 'ಕ್ಷಮಿಸಿ', 'ಹೌದು'], correct: 1 },
-    { target: 'ನೀರು', options: ['ಸೇಬು', 'ನೀರು', 'ಮನೆ', 'ಮರ'], correct: 1 },
-    { target: 'ಆಹಾರ', options: ['ಪುಸ್ತಕ', 'ಸ್ನೇಹಿತ', 'ಆಹಾರ', 'ಹಣ'], correct: 2 },
-    { target: 'ಶಾಲೆ', options: ['ಆಸ್ಪತ್ರೆ', 'ಕಚೇರಿ', 'ಅಂಗಡಿ', 'ಶಾಲೆ'], correct: 3 },
+    { native: 'कुत्ता', english: 'Dog', emoji: '🐶' },
+    { native: 'बिल्ली', english: 'Cat', emoji: '🐱' },
+    { native: 'हाथी', english: 'Elephant', emoji: '🐘' },
+    { native: 'शेर', english: 'Lion', emoji: '🦁' },
+    { native: 'चिड़िया', english: 'Bird', emoji: '🐦' },
+    { native: 'मछली', english: 'Fish', emoji: '🐟' },
+    { native: 'घोड़ा', english: 'Horse', emoji: '🐴' },
+    { native: 'भालू', english: 'Bear', emoji: '🐻' },
+    { native: 'किताब', english: 'Book', emoji: '📚' },
+    { native: 'घर', english: 'House', emoji: '🏠' },
+    { native: 'स्कूल', english: 'School', emoji: '🏫' },
+    { native: 'गाड़ी', english: 'Car', emoji: '🚗' },
+    { native: 'पेड़', english: 'Tree', emoji: '🌳' },
+    { native: 'फूल', english: 'Flower', emoji: '🌺' },
+    { native: 'सूरज', english: 'Sun', emoji: '☀️' },
+    { native: 'पानी', english: 'Water', emoji: '💧' },
   ]
 };
 
-export const PICTURE_GAME_POOLS: Record<string, Array<{ emoji: string, options: string[], correct: number }>> = {
+const BASE_ADJS: Record<string, Array<{ native: string; english: string }>> = {
   tamil: [
-    { emoji: '🍎', options: ['பழம்', 'தண்ணீர்', 'வீடு', 'மரம்'], correct: 0 },
-    { emoji: '🏠', options: ['பள்ளி', 'மரம்', 'வீடு', 'கோவில்'], correct: 2 },
-    { emoji: '🚗', options: ['கார்', 'சைக்கிள்', 'பழம்', 'வண்டி'], correct: 0 },
-    { emoji: '🐕', options: ['பூனை', 'நாய்', 'குதிரை', 'பசு'], correct: 1 },
-    { emoji: '🌳', options: ['கொடி', 'மரம்', 'பூ', 'இலை'], correct: 1 },
+    { native: 'பெரிய', english: 'Big' },
+    { native: 'சிறிய', english: 'Small' },
+    { native: 'புதிய', english: 'New' },
+    { native: 'பழைய', english: 'Old' },
+    { native: 'அழகான', english: 'Beautiful' },
+    { native: 'நல்ல', english: 'Good' },
+    { native: 'வேகமான', english: 'Fast' },
+    { native: 'இனிமையான', english: 'Sweet' },
+    { native: 'சிவப்பு', english: 'Red' },
+    { native: 'நீல', english: 'Blue' },
+    { native: 'பச்சை', english: 'Green' },
+    { native: 'மஞ்சள்', english: 'Yellow' },
+    { native: 'வெள்ளை', english: 'White' },
+    { native: 'கருப்பு', english: 'Black' },
   ],
   hindi: [
-    { emoji: '🍎', options: ['फल', 'पानी', 'घर', 'पेड़'], correct: 0 },
-    { emoji: '🏠', options: ['स्कूल', 'पेड़', 'घर', 'मंदिर'], correct: 2 },
-    { emoji: '🚗', options: ['कार', 'साइकिल', 'फल', 'गाड़ी'], correct: 0 },
-    { emoji: '🐕', options: ['बिल्ली', 'कुत्ता', 'घोड़ा', 'गाय'], correct: 1 },
-    { emoji: '🌳', options: ['बेल', 'पेड़', 'फूल', 'पत्ता'], correct: 1 },
-  ],
-  telugu: [
-    { emoji: '🍎', options: ['పండు', 'నీరు', 'ఇల్లు', 'చెట్టు'], correct: 0 },
-    { emoji: '🏠', options: ['పాఠశాల', 'చెట్టు', 'ఇల్లు', 'గుడి'], correct: 2 },
-    { emoji: '🚗', options: ['కారు', 'సైకిల్', 'పండు', 'బండి'], correct: 0 },
-    { emoji: '🐕', options: ['పిల్లి', 'కుక్క', 'గుర్రం', 'ఆవు'], correct: 1 },
-    { emoji: '🌳', options: ['తీగ', 'చెట్టు', 'పువ్వు', 'ఆకు'], correct: 1 },
-  ],
-  malayalam: [
-    { emoji: '🍎', options: ['പഴം', 'വെള്ളം', 'വീട്', 'മരം'], correct: 0 },
-    { emoji: '🏠', options: ['സ്കൂൾ', 'മരം', 'വീട്', 'അമ്പലം'], correct: 2 },
-    { emoji: '🚗', options: ['കാർ', 'സൈക്കിൾ', 'പഴം', 'വണ്ടി'], correct: 0 },
-    { emoji: '🐕', options: ['പൂച്ച', 'നായ', 'കുതിര', 'പശു'], correct: 1 },
-    { emoji: '🌳', options: ['വള്ളി', 'മരം', 'പൂവ്', 'ഇല'], correct: 1 },
-  ],
-  kannada: [
-    { emoji: '🍎', options: ['ಹಣ್ಣು', 'ನೀರು', 'ಮನೆ', 'ಮರ'], correct: 0 },
-    { emoji: '🏠', options: ['ಶಾಲೆ', 'ಮರ', 'ಮನೆ', 'ದೇವಾಲಯ'], correct: 2 },
-    { emoji: '🚗', options: ['ಕಾರು', 'ಸೈಕಲ್', 'ಹಣ್ಣು', 'ಗಾಡಿ'], correct: 0 },
-    { emoji: '🐕', options: ['ಬೆಕ್ಕು', 'ನಾಯಿ', 'ಕುದುರೆ', 'ಹಸು'], correct: 1 },
-    { emoji: '🌳', options: ['ಬಳ್ಳಿ', 'ಮರ', 'ಹೂವು', 'ಎಲೆ'], correct: 1 },
+    { native: 'बड़ा', english: 'Big' },
+    { native: 'छोटा', english: 'Small' },
+    { native: 'नया', english: 'New' },
+    { native: 'सुंदर', english: 'Beautiful' },
   ]
+};
+
+BASE_WORDS.telugu = BASE_WORDS.tamil;
+BASE_WORDS.malayalam = BASE_WORDS.tamil;
+BASE_WORDS.kannada = BASE_WORDS.tamil;
+
+BASE_ADJS.telugu = BASE_ADJS.tamil;
+BASE_ADJS.malayalam = BASE_ADJS.tamil;
+BASE_ADJS.kannada = BASE_ADJS.tamil;
+
+function build5000ListenQuestions(lang: string) {
+  const words = BASE_WORDS[lang] || BASE_WORDS.tamil;
+  const adjs = BASE_ADJS[lang] || BASE_ADJS.tamil;
+  const list = [];
+
+  for (let i = 0; i < 5000; i++) {
+    const w = words[i % words.length];
+    const a = adjs[Math.floor(i / words.length) % adjs.length];
+    
+    let target = w.native;
+    let correctMeaning = w.english;
+    if (i >= words.length) {
+      if (i < words.length * adjs.length) {
+        target = `${a.native} ${w.native}`;
+        correctMeaning = `${a.english} ${w.english}`;
+      } else {
+        const num = i - (words.length * adjs.length) + 1;
+        target = `${num} ${a.native} ${w.native}`;
+        correctMeaning = `${num} ${a.english} ${w.english}s`;
+      }
+    }
+
+    const d1 = words[(i + 7) % words.length].english;
+    const d2 = words[(i + 13) % words.length].english;
+    const d3 = words[(i + 23) % words.length].english;
+    const wrongs = Array.from(new Set([d1, d2, d3])).filter(x => x !== correctMeaning);
+    while (wrongs.length < 3) wrongs.push(`Option ${wrongs.length + 1}`);
+
+    const options = [correctMeaning, ...wrongs.slice(0, 3)];
+    const correct = i % 4;
+    [options[0], options[correct]] = [options[correct], options[0]];
+
+    list.push({ target, options, correct });
+  }
+  return list;
+}
+
+function build5000PictureQuestions(lang: string) {
+  const words = BASE_WORDS[lang] || BASE_WORDS.tamil;
+  const adjs = BASE_ADJS[lang] || BASE_ADJS.tamil;
+  const list = [];
+
+  for (let i = 0; i < 5000; i++) {
+    const w = words[i % words.length];
+    const a = adjs[Math.floor(i / words.length) % adjs.length];
+    
+    let word = w.native;
+    if (i >= words.length) {
+      if (i < words.length * adjs.length) {
+        word = `${a.native} ${w.native}`;
+      } else {
+        const num = i - (words.length * adjs.length) + 1;
+        word = `${num} ${a.native} ${w.native}`;
+      }
+    }
+
+    const d1 = words[(i + 5) % words.length].native;
+    const d2 = words[(i + 11) % words.length].native;
+    const d3 = words[(i + 19) % words.length].native;
+    const wrongs = Array.from(new Set([d1, d2, d3])).filter(x => x !== word);
+    while (wrongs.length < 3) wrongs.push(`Word ${wrongs.length + 1}`);
+
+    const options = [word, ...wrongs.slice(0, 3)];
+    const correct = i % 4;
+    [options[0], options[correct]] = [options[correct], options[0]];
+
+    list.push({ emoji: w.emoji, options, correct });
+  }
+  return list;
+}
+
+export const LISTEN_GAME_POOLS: Record<string, Array<{ target: string, options: string[], correct: number }>> = {
+  tamil: build5000ListenQuestions('tamil'),
+  hindi: build5000ListenQuestions('hindi'),
+  telugu: build5000ListenQuestions('telugu'),
+  malayalam: build5000ListenQuestions('malayalam'),
+  kannada: build5000ListenQuestions('kannada'),
+};
+
+export const PICTURE_GAME_POOLS: Record<string, Array<{ emoji: string, options: string[], correct: number }>> = {
+  tamil: build5000PictureQuestions('tamil'),
+  hindi: build5000PictureQuestions('hindi'),
+  telugu: build5000PictureQuestions('telugu'),
+  malayalam: build5000PictureQuestions('malayalam'),
+  kannada: build5000PictureQuestions('kannada'),
 };
 
 export const CULTURE_DATA: Record<string, any> = {
@@ -176,9 +284,54 @@ export const CULTURE_DATA: Record<string, any> = {
     heroTitle: 'விருந்தோம்பல் (Virunthombal)',
     heroDesc: 'The ancient Tamil tradition of unparalleled hospitality.',
     festivals: [
-      { id: 'pongal', title: 'Pongal (பொங்கல்)', desc: 'The Tamil harvest festival.', vocab: 'கரும்பு (Sugarcane)', icon: '🌾', color: '#FEF3C7' },
-      { id: 'diwali', title: 'Deepavali (தீபாவளி)', desc: 'The festival of lights.', vocab: 'பட்டாசு (Firecrackers)', icon: '🪔', color: '#FEE2E2' },
-      { id: 'newyear', title: 'Tamil New Year (புத்தாண்டு)', desc: 'Puthandu marks the first day of the year.', vocab: 'மாங்காய் (Mango)', icon: '🌞', color: '#D1FAE5' }
+      {
+        id: 'pongal',
+        title: 'Pongal (பொங்கல்)',
+        desc: 'The Tamil harvest festival of thanksgiving.',
+        vocab: 'கரும்பு (Sugarcane)',
+        icon: '🌾',
+        color: '#FEF3C7',
+        storyMoralNative: 'இயற்கையையும் உழவர்களையும் மதித்து நன்றி செலுத்துவதே மனித பண்பாடு.',
+        storyMoral: 'Honoring nature and farmers is the true essence of human culture.',
+        storyParagraphs: [
+          { native: 'பொங்கல் விழா உழவர்களுக்கும் இயற்கைக்கும் நன்றி தெரிவிக்கும் அறுவடைத் திருவிழா ஆகும்.', english: 'Pongal is the grand harvest festival expressing deep gratitude to farmers and nature.' },
+          { native: 'சூரிய பகவானுக்கு நன்றி செலுத்த புதுப் பானையில் புதிய அரிசி, வெல்லம், பால் சேர்த்துப் பொங்கலிடுவார்கள்.', english: 'Fresh rice, jaggery, and milk are boiled in new clay pots under the morning sky as an offering to Sun God Surya.' },
+          { native: 'பானை பொங்கி வரும் போது "பொங்கலோ பொங்கல்!" என்று குடும்பத்தினர் மகிழ்ச்சியோடு ஆரவாரம் செய்வார்கள்.', english: 'When the pot boils over, everyone joyfully shouts "Pongalo Pongal!" welcoming sweetness and prosperity.' },
+          { native: 'மாட்டுப் பொங்கலன்று மாடுகளைக் குளிப்பாட்டி, மாலை அணிவித்து, கரும்பு மற்றும் பழங்களை வழங்கி மகிழ்வார்கள்.', english: 'On Mattu Pongal, cattle are bathed, decorated with garlands, and fed fresh sugarcane and fruits.' }
+        ]
+      },
+      {
+        id: 'diwali',
+        title: 'Deepavali (தீபாவளி)',
+        desc: 'The festival of lights symbolizing victory of good.',
+        vocab: 'பட்டாசு (Firecrackers)',
+        icon: '🪔',
+        color: '#FEE2E2',
+        storyMoralNative: 'எப்போதும் தீமை அழிந்து நன்மையே வெற்றி பெறும்.',
+        storyMoral: 'Goodness and light will always triumph over darkness and evil.',
+        storyParagraphs: [
+          { native: 'தீபாவளி என்பது இருளை நீக்கி ஒளியைத் தரும் மகிழ்ச்சியான திருநாள் ஆகும்.', english: 'Deepavali is the radiant festival of lights that dispels darkness and brings happiness.' },
+          { native: 'நரகாசுரன் எனும் தீய சக்தியை இறைவன் அழித்து உலகிற்கு நன்மையைத் தந்த நாள் இது.', english: 'It celebrates the defeat of the evil demon Narakasura, restoring peace and righteousness.' },
+          { native: 'மக்கள் விடியற்காலையில் நல்லெண்ணெய் தேய்த்துக் குளித்து, புதிய ஆடைகள் அணிந்து தீபங்களை ஏற்றுவார்கள்.', english: 'People take an early oil bath, wear new clothes, and light bright oil lamps in every home.' },
+          { native: 'சுவையான இனிப்புகளையும் பலகாரங்களையும் பகிர்ந்து கொண்டு பட்டாசுகளை வெடித்து மகிழ்வார்கள்.', english: 'Delicious sweets are shared with loved ones while colorful fireworks light up the night.' }
+        ]
+      },
+      {
+        id: 'newyear',
+        title: 'Tamil New Year (புத்தாண்டு)',
+        desc: 'Puthandu marks the prosperous first day of the year.',
+        vocab: 'மாங்காய் (Mango)',
+        icon: '🌞',
+        color: '#D1FAE5',
+        storyMoralNative: 'வாழ்க்கையின் எல்லா மாற்றங்களையும் நேர்மறையாக ஏற்றுக்கொள்ள வேண்டும்.',
+        storyMoral: 'Welcome all life experiences with balance, hope, and optimism.',
+        storyParagraphs: [
+          { native: 'சித்திரை முதல் நாள் தமிழ்ப் புத்தாண்டு தினமாகக் கோலாகலமாகக் கொண்டாடப்படுகிறது.', english: 'Chithirai 1st marks the auspicious and joyous celebration of Tamil New Year Puthandu.' },
+          { native: 'இந்நாளில் மா, பலா, வாழை ஆகிய முக்கனிகள் மற்றும் தங்க நகைகளைத் தட்டில் வைத்து \'கணி\' காண்பார்கள்.', english: 'Families view \'Mangala Kani\'—an arrangement of mango, jackfruit, banana, and gold for good luck.' },
+          { native: 'இனிப்பு, கசப்பு, உவர்ப்பு கலந்த \'வேப்பம்பூ பச்சடி\' செய்து உண்பார்கள்.', english: 'Special \'Veppampoo Pachadi\' combining sweet, sour, and bitter neem flowers is served.' },
+          { native: 'வாழ்க்கையில் இன்பமும் துன்பமும் கலந்தே இருக்கும் என்பதை இது நமக்குக் கற்பிக்கிறது.', english: 'This reminds us that life is a balanced harmony of all emotions and experiences.' }
+        ]
+      }
     ],
     arts: [
       { title: 'Bharatanatyam', icon: '💃', desc: 'Classical Dance' },
@@ -191,9 +344,54 @@ export const CULTURE_DATA: Record<string, any> = {
     heroTitle: 'अतिथि देवो भव (Atithi Devo Bhava)',
     heroDesc: 'The Sanskrit/Hindi tradition meaning "The guest is equivalent to God".',
     festivals: [
-      { id: 'holi', title: 'Holi (होली)', desc: 'The festival of colors.', vocab: 'रंग (Colors)', icon: '🎨', color: '#FCE7F3' },
-      { id: 'diwali', title: 'Diwali (दिवाली)', desc: 'The festival of lights.', vocab: 'दीया (Lamp)', icon: '🪔', color: '#FEE2E2' },
-      { id: 'navratri', title: 'Navratri (नवरात्रि)', desc: 'A nine-night festival.', vocab: 'गरबा (Garba)', icon: '💃', color: '#E0E7FF' }
+      {
+        id: 'holi',
+        title: 'Holi (होली)',
+        desc: 'The festival of colors and friendship.',
+        vocab: 'रंग (Colors)',
+        icon: '🎨',
+        color: '#FCE7F3',
+        storyMoralNative: 'प्रेम और भाईचारे से हर दिल जीता जा सकता है।',
+        storyMoral: 'Love and harmony can win every heart and unite communities.',
+        storyParagraphs: [
+          { native: 'होली भारत का सबसे रंगीन और खुशी देने वाला त्योहार है।', english: 'Holi is the most colorful and joyful spring festival celebrated across India.' },
+          { native: 'भक्त प्रह्लाद की सच्चाई और होलिका की हार की याद में यह मनाया जाता है।', english: 'It commemorates the devotion of Bhakt Prahlad and the victory of truth over evil.' },
+          { native: 'लोग एक-दूसरे को लाल, पीले और हरे रंग लगाकर गले मिलते हैं।', english: 'People smear bright gulal colors on each other and embrace with pure warmth.' },
+          { native: 'पुरानी कड़वाहट भूलकर नए रिश्तों की शुरुआत करने का यह सुंदर दिन है।', english: 'It is a wonderful day to forgive past misunderstandings and form new bonds.' }
+        ]
+      },
+      {
+        id: 'diwali',
+        title: 'Diwali (दिवाली)',
+        desc: 'The grand festival of lights.',
+        vocab: 'दीया (Lamp)',
+        icon: '🪔',
+        color: '#FEE2E2',
+        storyMoralNative: 'सच्चाई और प्रकाश की हमेशा जीत होती है।',
+        storyMoral: 'Truth and light will always conquer falsehood and darkness.',
+        storyParagraphs: [
+          { native: 'दिवाली प्रकाश का सबसे पवित्र त्योहार है जो खुशियाँ लाता है।', english: 'Diwali is the sacred festival of lights bringing prosperity to every home.' },
+          { native: 'भगवान राम १४ वर्ष के वनवास के बाद अयोध्या वापस लौटे थे।', english: 'Lord Rama returned to Ayodhya after 14 years of exile on this historic day.' },
+          { native: 'घरों को सुंदर दीयों, मोमबत्तियों और रंगोली से सजाया जाता है।', english: 'Homes are decorated with glowing diyas, candles, and colorful floor rangoli.' },
+          { native: 'लोग मिठाइयाँ बाँटते हैं और माँ लक्ष्मी की पूजा करते हैं।', english: 'Delicious sweets are shared while praying to Goddess Lakshmi for blessings.' }
+        ]
+      },
+      {
+        id: 'navratri',
+        title: 'Navratri (नवरात्रि)',
+        desc: 'Nine nights of divine celebration.',
+        vocab: 'गरबा (Garba)',
+        icon: '💃',
+        color: '#E0E7FF',
+        storyMoralNative: 'नारी शक्ति और भक्ति सर्वोपरि है।',
+        storyMoral: 'Divine energy, devotion, and respect for womanhood triumph always.',
+        storyParagraphs: [
+          { native: 'नवरात्रि नौ रातों का एक भक्तिमय और ऊर्जावान त्योहार है।', english: 'Navratri is a vibrant nine-night festival of devotion, music, and dance.' },
+          { native: 'माँ दुर्गा ने महिषासुर राक्षस का वध करके अधर्म का नाश किया था।', english: 'Goddess Durga defeated the demon Mahishasura, eliminating evil from earth.' },
+          { native: 'लोग उपवास रखते हैं, माँ दुर्गा की आरती करते हैं और गरबा खेलते हैं।', english: 'Devotees fast, perform sacred aarti prayers, and dance traditional Garba.' },
+          { native: 'दसवें दिन विजयादशमी का त्योहार बड़े धूमधाम से मनाया जाता है।', english: 'On the tenth day, Vijayadashami is celebrated with immense joy and vigor.' }
+        ]
+      }
     ],
     arts: [
       { title: 'Kathak', icon: '💃', desc: 'Classical Dance' },
@@ -206,9 +404,54 @@ export const CULTURE_DATA: Record<string, any> = {
     heroTitle: 'అతిథి మర్యాద (Atithi Maryada)',
     heroDesc: 'The Telugu tradition of deep respect and care for guests.',
     festivals: [
-      { id: 'ugadi', title: 'Ugadi (ఉగాది)', desc: 'The Telugu New Year.', vocab: 'పచ్చడి (Pickle/Chutney)', icon: '🌿', color: '#D1FAE5' },
-      { id: 'sankranti', title: 'Sankranti (సంక్రాంతి)', desc: 'Harvest festival.', vocab: 'గాలిపటం (Kite)', icon: '🪁', color: '#FEF3C7' },
-      { id: 'bathukamma', title: 'Bathukamma (బతుకమ్మ)', desc: 'Floral festival.', vocab: 'పూలు (Flowers)', icon: '🌸', color: '#FCE7F3' }
+      {
+        id: 'ugadi',
+        title: 'Ugadi (ఉగాది)',
+        desc: 'The Telugu New Year of fresh beginnings.',
+        vocab: 'పచ్చడి (Chutney)',
+        icon: '🌿',
+        color: '#D1FAE5',
+        storyMoralNative: 'జీవితంలోని ప్రతీ అనుభవాన్ని ఆనందంగా స్వీకరించాలి.',
+        storyMoral: 'Embrace every experience of life with balance and optimism.',
+        storyParagraphs: [
+          { native: 'ఉగాది తెలుగు ప్రజల నూతన సంవత్సరాది పండుగ.', english: 'Ugadi marks the prosperous onset of the Telugu New Year.' },
+          { native: 'ఈ రోజున షడ్రుచుల సమ్మేళనంతో \'ఉగాది పచ్చడి\' తయారు చేస్తారు.', english: 'The unique \'Ugadi Pachadi\' featuring six distinct tastes is prepared.' },
+          { native: 'తీపి, చేదు, పులుపుల కలయిక జీవితంలోని అనుభవాలను సూచిస్తుంది.', english: 'The mix of sweet, bitter, and sour represents life\'s diverse emotions.' },
+          { native: 'కొత్త లక్ష్యాలతో అందరూ సంతోషంగా పండుగను జరుపుకుంటారు.', english: 'Everyone steps into the new year with renewed hope, joy, and goals.' }
+        ]
+      },
+      {
+        id: 'sankranti',
+        title: 'Sankranti (సంక్రాంతి)',
+        desc: 'Harvest festival of colorful kites.',
+        vocab: 'గాలిపటం (Kite)',
+        icon: '🪁',
+        color: '#FEF3C7',
+        storyMoralNative: 'రైతుల శ్రమను గౌరవించడం అందరి బాధ్యత.',
+        storyMoral: 'Honoring the hard work of farmers is the duty of all society.',
+        storyParagraphs: [
+          { native: 'సంక్రాంతి తెలుగు వారి పెద్ద పండుగ మరియు పంటల పండుగ.', english: 'Sankranti is the grand harvest festival celebrating nature\'s bounty.' },
+          { native: 'ఇంటి ముందు రంగురంగుల ముగ్గులు వేసి గొబ్బెమ్మలు పెడతారు.', english: 'Homes are decorated with vibrant muggulu rangolis and flower garlands.' },
+          { native: 'పిల్లలు ఆకాశంలోకి రంగురంగుల గాలిపటాలను ఎగురవేస్తారు.', english: 'Children joyfully fly colorful kites high up in the sunny blue sky.' },
+          { native: 'పాడిపంటలతో రైతుల ఇళ్లు ధాన్య లక్ష్మితో నిండిపోతాయి.', english: 'Farmers\' barns overflow with golden paddy grains and fresh harvest.' }
+        ]
+      },
+      {
+        id: 'bathukamma',
+        title: 'Bathukamma (బతుకమ్మ)',
+        desc: 'The grand floral festival of Telangana.',
+        vocab: 'పూలు (Flowers)',
+        icon: '🌸',
+        color: '#FCE7F3',
+        storyMoralNative: 'ప్రకృతి తల్లిని పూజించడం ప్రాచీన సంస్కృతి.',
+        storyMoral: 'Worshipping Mother Nature preserves our ancient roots and peace.',
+        storyParagraphs: [
+          { native: 'బతుకమ్మ తెలంగాణ ప్రాంతంలో జరుపుకునే అందమైన పూల పండుగ.', english: 'Bathukamma is a breathtaking floral festival celebrated with devotion.' },
+          { native: 'మహిళలు రంగురంగుల పూలను పేర్చి బతుకమ్మను తయారు చేస్తారు.', english: 'Women stack vibrant seasonal flowers in cone shapes to craft Bathukamma.' },
+          { native: 'చుట్టూ తిరుగుతూ జానపద పాటలు పాడుతూ ఆనందంగా ఆడతారు.', english: 'They circle around singing traditional folk songs in sweet harmony.' },
+          { native: 'చివరగా బతుకమ్మను నీటిలో నిమజ్జనం చేసి శుభాకాంక్షలు తెలుపుకుంటారు.', english: 'The flowers are gently immersed in water with prayers for prosperity.' }
+        ]
+      }
     ],
     arts: [
       { title: 'Kuchipudi', icon: '💃', desc: 'Classical Dance' },
@@ -221,9 +464,54 @@ export const CULTURE_DATA: Record<string, any> = {
     heroTitle: 'അതിഥി സത്കാരം (Athidhi Sathkaram)',
     heroDesc: 'The Kerala tradition of warm and grand hospitality.',
     festivals: [
-      { id: 'onam', title: 'Onam (ഓണം)', desc: 'The grand harvest festival of Kerala.', vocab: 'പൂക്കളം (Floral Carpet)', icon: '🌸', color: '#FEF3C7' },
-      { id: 'vishu', title: 'Vishu (വിഷു)', desc: 'Kerala New Year.', vocab: 'കണി (Auspicious sight)', icon: '🌞', color: '#D1FAE5' },
-      { id: 'pooram', title: 'Thrissur Pooram', desc: 'Grand temple festival.', vocab: 'ആന (Elephant)', icon: '🐘', color: '#E0E7FF' }
+      {
+        id: 'onam',
+        title: 'Onam (ഓണം)',
+        desc: 'The harvest festival welcoming King Mahabali.',
+        vocab: 'പൂക്കളം (Floral Carpet)',
+        icon: '🌸',
+        color: '#FEF3C7',
+        storyMoralNative: 'സമത്വവും ഐക്യവും നാടിൻ്റെ ഐശ്വര്യമാണ്.',
+        storyMoral: 'Equality, truth, and unity bring eternal prosperity.',
+        storyParagraphs: [
+          { native: 'ഓണം കേരളത്തിന്റെ ഏറ്റവും വലിയ സാംസ്കാരിക ഉത്സവമാണ്.', english: 'Onam is the grandest cultural harvest festival of Kerala.' },
+          { native: 'നാടുവാണിരുന്ന മഹാബലി രാജാവ് തൻ്റെ ജനങ്ങളെ കാണാൻ എത്തുന്ന ദിവസമാണിത്.', english: 'It marks the annual return of the benevolent King Mahabali to visit his people.' },
+          { native: 'വീടുകളുടെ മുറ്റത്ത് പൂക്കളം ഒരുക്കിയും ഗംഭീരമായ ഓണസദ്യ കടിച്ചും ആഘോഷിക്കുന്നു.', english: 'Homes are adorned with Pookkalam flower carpets and delicious Onam Sadya feasts.' },
+          { native: 'വള്ളംകളിയും വഞ്ചപ്പാട്ടുകളും കേരളത്തിന്റെ പ്രകൃതിഭംഗിയെ വിളിച്ചോതുന്നു.', english: 'Thrilling boat races (Vallam Kali) showcase Kerala\'s beautiful backwaters.' }
+        ]
+      },
+      {
+        id: 'vishu',
+        title: 'Vishu (വിഷു)',
+        desc: 'Kerala New Year of auspicious sightings.',
+        vocab: 'കണി (Auspicious Sight)',
+        icon: '🌞',
+        color: '#D1FAE5',
+        storyMoralNative: 'നല്ല തുടക്കം നല്ല ഭാവി ഉറപ്പുനൽകുന്നു.',
+        storyMoral: 'An auspicious and hopeful start secures a bright future.',
+        storyParagraphs: [
+          { native: 'വിഷു മലയാളി മാസമായ മേടം ഒന്നാം തീയതി ആഘോഷിക്കുന്നു.', english: 'Vishu marks the auspicious Malayali New Year celebrated on Medam 1st.' },
+          { native: 'കണിക്കൊന്നയും നെല്ലും സ്വർണ്ണവും ചേർത്ത \'വിഷുകണി\' രാവിലെ കാണുന്നു.', english: 'People wake up to see \'Vishukkani\'—golden Cassia flowers, rice, and gold.' },
+          { native: 'മുതിർന്നവർ കുട്ടികൾക്ക് \'വിഷുക്കൈനീട്ടം\' പണം നൽകി അനുഗ്രഹിക്കുന്നു.', english: 'Elders bless children by giving them \'Vishukkaineetam\' silver and gold coins.' },
+          { native: 'വിഷുസദ്യയും പടക്കങ്ങളും ആഘോഷത്തിന് മാറ്റുകൂട്ടുന്നു.', english: 'A grand Vishu Sadya feast and fireworks make the day unforgettable.' }
+        ]
+      },
+      {
+        id: 'pooram',
+        title: 'Thrissur Pooram',
+        desc: 'Grand temple festival of magnificent elephants.',
+        vocab: 'ആന (Elephant)',
+        icon: '🐘',
+        color: '#E0E7FF',
+        storyMoralNative: 'കലയും സംസ്കാരവും ജനങ്ങളെ ഒന്നിച്ചുചേർക്കുന്നു.',
+        storyMoral: 'Art, music, and culture bring diverse people together in joy.',
+        storyParagraphs: [
+          { native: 'തൃശ്ശൂർ പൂരം കേരളത്തിലെ ഏറ്റവും വലിയ അമ്പലപ്പൂരമാണ്.', english: 'Thrissur Pooram is the most magnificent temple spectacle of Kerala.' },
+          { native: 'അലങ്കരിച്ച ആനകളുടെ പ്രൗഢമായ അണിനിരക്കൽ പ്രധാന ആകർഷണമാണ്.', english: 'Majestically decorated elephants lined up in royal attire captivate all.' },
+          { native: 'പഞ്ചവാദ്യവും ഇലഞ്ഞിത്തറ മേളവും ആവേശഭരിതമായ സംഗീതാനുഭവമാണ്.', english: 'Sensational Panchavadyam drum beats create a powerful musical symphony.' },
+          { native: 'രാത്രിയിലെ വർണ്ണാഭമായ വെടിക്കെട്ട് ആകാശത്തെ മനോഹരമാക്കുന്നു.', english: 'The spectacular midnight fireworks display lights up the entire sky.' }
+        ]
+      }
     ],
     arts: [
       { title: 'Kathakali', icon: '🎭', desc: 'Classical Dance' },
@@ -236,9 +524,54 @@ export const CULTURE_DATA: Record<string, any> = {
     heroTitle: 'ಅತಿಥಿ ಸತ್ಕಾರ (Atithi Satkara)',
     heroDesc: 'The Kannada tradition of welcoming guests with open arms.',
     festivals: [
-      { id: 'dasara', title: 'Mysuru Dasara (ದಸರಾ)', desc: 'The grand state festival.', vocab: 'ಆನೆ (Elephant)', icon: '🐘', color: '#FEF3C7' },
-      { id: 'ugadi', title: 'Ugadi (ಯುಗಾದಿ)', desc: 'The Kannada New Year.', vocab: 'ಬೇವು-ಬೆಲ್ಲ (Neem-Jaggery)', icon: '🌿', color: '#D1FAE5' },
-      { id: 'sankranti', title: 'Makara Sankranti', desc: 'Harvest festival.', vocab: 'ಎಳ್ಳು (Sesame)', icon: '🪁', color: '#FEE2E2' }
+      {
+        id: 'dasara',
+        title: 'Mysuru Dasara (ದಸರಾ)',
+        desc: 'The grand royal festival of victory.',
+        vocab: 'ಆನೆ (Elephant)',
+        icon: '🐘',
+        color: '#FEF3C7',
+        storyMoralNative: 'ಸತ್ಯ ಮತ್ತು ಧರ್ಮಕ್ಕೆ ಎಂದಿಗೂ ಅಳಿವಿಲ್ಲ.',
+        storyMoral: 'Truth and righteousness endure forever against all odds.',
+        storyParagraphs: [
+          { native: 'ದಸರಾ ಕರ್ನಾಟಕದ ಅತ್ಯಂತ ವೈಭವೋಪೇತವಾದ ನಾಡಹಬ್ಬವಾಗಿದೆ.', english: 'Dasara is the grandest state festival celebrating royal heritage.' },
+          { native: 'ಚಾಮುಂಡೇಶ್ವರಿ ದೇವಿ ಮಹಿಷಾಸುರನನ್ನು ಸಂಹಾರ ಮಾಡಿ ವಿಜಯ ಸಾಧಿಸಿದ ದಿನವಿದು.', english: 'It honors Goddess Chamundeshwari\'s victory over the demon Mahishasura.' },
+          { native: 'ಮೈಸೂರು ಅರಮನೆಯನ್ನು ಲಕ್ಷಾಂತರ ದೀಪಗಳಿಂದ ಅಲಂಕರಿಸಿ ಜಂಬೂಸವಾರಿ ನಡೆಸಲಾಗುತ್ತದೆ.', english: 'Mysuru Palace shines with 100,000 lights during the royal Jumboo Savari.' },
+          { native: 'ಧರ್ಮ ಮತ್ತು ಸತ್ಯಕ್ಕೆ ಎಂದಿಗೂ ಜಯ ಸಿಗುತ್ತದೆ ಎಂದು ಈ ಹಬ್ಬ ಸಾರುತ್ತದೆ.', english: 'This grand tradition proclaims the ultimate triumph of goodness.' }
+        ]
+      },
+      {
+        id: 'ugadi',
+        title: 'Ugadi (ಯುಗಾದಿ)',
+        desc: 'The Kannada New Year of sweet neem.',
+        vocab: 'ಬೇವು-ಬೆಲ್ಲ (Neem-Jaggery)',
+        icon: '🌿',
+        color: '#D1FAE5',
+        storyMoralNative: 'ಜೀವನವು ಸುಖ-ದುಃಖಗಳ ಸಮಾನ ಸಮ್ಮಿಲನವಾಗಿದೆ.',
+        storyMoral: 'Life is a harmonious blend of sweet and bitter moments.',
+        storyParagraphs: [
+          { native: 'ಯುಗಾದಿ ಕನ್ನಡಿಗರ ಹೊಸ ವರ್ಷದ ಮೊದಲ ಹಬ್ಬ.', english: 'Ugadi marks the cherished first day of the Kannada New Year.' },
+          { native: 'ಈ ದಿನ \'ಬೇವು-ಬೆಲ್ಲ\'ವನ್ನು ಎಲ್ಲರಿಗೂ ಹಂಚಿ ಶುಭ ಕೋರಲಾಗುತ್ತದೆ.', english: 'People share \'Beavu-Bella\' (bitter neem and sweet jaggery) with everyone.' },
+          { native: 'ಇದು ಜೀವನದ ಸುಖ-ದುಃಖಗಳನ್ನು ಸಮಾನವಾಗಿ ಸ್ವೀಕರಿಸಲು ಕಲಿಸುತ್ತದೆ.', english: 'This teaches us to accept both joy and sorrow with equal grace.' },
+          { native: 'ಮನೆಗಳ ಮುಂದೆ ಹೊಸ ಮಾವಿನ ತೋರಣಗಳನ್ನು ಕಟ್ಟಿ ಸಂಭ್ರಮಿಸುತ್ತಾರೆ.', english: 'Homes are decorated with fresh mango leaf torans for good luck.' }
+        ]
+      },
+      {
+        id: 'sankranti',
+        title: 'Makara Sankranti',
+        desc: 'Harvest festival of sharing sweet sesame.',
+        vocab: 'ಎಳ್ಳು (Sesame)',
+        icon: '🪁',
+        color: '#FEE2E2',
+        storyMoralNative: 'ಸಿಹಿ ಮಾತುಗಳಿಂದ ಬಂಧಗಳು ಗಟ್ಟಿಯಾಗುತ್ತವೆ.',
+        storyMoral: 'Kind words and sweet hearts build lifelong friendships.',
+        storyParagraphs: [
+          { native: 'ಮಕರ ಸಂಕ್ರಾಂತಿ ರೈತರ ಮುಖ್ಯ ಸುಗ್ಗಿ ಹಬ್ಬವಾಗಿದೆ.', english: 'Makara Sankranti is the primary harvest festival honoring nature.' },
+          { native: 'ಕನ್ನಡಿಗರು \'ಎಳ್ಳು-ಬೆಲ್ಲ ಬಿತ್ತಿ ಒಳ್ಳೆಯ ಮಾತಾಡಿ\' ಎಂದು ಹಂಚುತ್ತಾರೆ.', english: 'People exchange \'Ellu-Bella\' saying "Share sesame and speak sweet words".' },
+          { native: 'ದನ-ಕರುಗಳನ್ನು ತೊಳೆದು ಬಣ್ಣ ಹಚ್ಚಿ ಕಿಚ್ಚು ಹಾಯಿಸಲಾಗುತ್ತದೆ.', english: 'Cattle are washed, painted with bright colors, and worshipped.' },
+          { native: 'ಆಕಾಶದಲ್ಲಿ ರಂಗುರಂಗಿನ ಗಾಳಿಪಟಗಳು ಹಾರಾಡುತ್ತವೆ.', english: 'Colorful kites fill the sky in celebration of the harvest.' }
+        ]
+      }
     ],
     arts: [
       { title: 'Yakshagana', icon: '🎭', desc: 'Traditional Theater' },

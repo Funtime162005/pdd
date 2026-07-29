@@ -10,14 +10,14 @@ import Animated, {
 import { Colors, Fonts, Radius, Shadow } from '../KidsTheme';
 
 const avatars: Record<string, any> = {
-  tiger: require('../../assets/avatars/tiger.png'),
-  panda: require('../../assets/avatars/panda.png'),
-  monkey: require('../../assets/avatars/monkey.png'),
-  elephant: require('../../assets/avatars/elephant.png'),
-  lion: require('../../assets/avatars/lion.png'),
-  koala: require('../../assets/avatars/koala.png'),
-  giraffe: require('../../assets/avatars/giraffe.png'),
-  penguin: require('../../assets/avatars/penguin.png'),
+  tiger: require('../../assets/avatars/tiger.jpg'),
+  panda: require('../../assets/avatars/panda.jpg'),
+  monkey: require('../../assets/avatars/monkey.jpg'),
+  elephant: require('../../assets/avatars/elephant.jpg'),
+  lion: require('../../assets/avatars/lion.jpg'),
+  koala: require('../../assets/avatars/koala.jpg'),
+  giraffe: require('../../assets/avatars/giraffe.jpg'),
+  penguin: require('../../assets/avatars/penguin.jpg'),
 };
 
 const navItems = [
@@ -167,11 +167,7 @@ export default function Sidebar() {
       <View style={{ flex: 1 }} />
 
       {/* Logout */}
-      <Pressable onPress={async () => {
-        await logout();
-        if (typeof window !== 'undefined') window.location.href = '/';
-        else router.replace('/');
-      }} style={styles.logoutBtn}>
+      <Pressable onPress={() => logout()} style={styles.logoutBtn}>
         <Text style={styles.logoutIcon}>🚪</Text>
         <Text style={styles.logoutText}>Log Out</Text>
       </Pressable>

@@ -1,12 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { generateReadingLesson, ReadingStory } from '../../utils/ai';
 import { playAudio } from '../../utils/speech';
 
-export default function ReadingUI({ title, tier }: { title: string, tier?: string }) {
-  const { user, updateProgress, completeModule } = useAuth();
+export default function ReadingUI({ 
+  skill = 'reading', 
+  title, 
+  tier, 
+  selectedLevelNum, 
+  onBack, 
+  onNextLevel 
+}: { 
+  skill?: string; 
+  title: string; 
+  tier?: string; 
+  selectedLevelNum?: number; 
+  onBack?: () => void; 
+  onNextLevel?: () => void; 
+}) {
+  const { user, updateProgress, completeModule, completeLevel } = useAuth();
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -22,12 +36,16 @@ export default function ReadingUI({ title, tier }: { title: string, tier?: strin
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [score, setScore] = useState(0);
 
+  const isAdvancingRef = useRef(false);
+
   useEffect(() => {
     let isMounted = true;
     const fetchStory = async () => {
       try {
+        setLoading(true);
         if (!user) return;
-        const activeLevel = tier || user.level || 'Beginner - Level 1';
+        const currentNum = selectedLevelNum || 1;
+        const activeLevel = `Level ${currentNum} (${tier || user.level || 'Beginner'})`;
         const lang = user.learningLanguage || 'tamil';
         const fetchedStory = await generateReadingLesson(activeLevel, lang);
         if (isMounted) {
@@ -37,13 +55,14 @@ export default function ReadingUI({ title, tier }: { title: string, tier?: strin
       } catch (err) {
         if (isMounted) {
           Alert.alert('Error', 'Failed to generate story. Please try again.');
-          router.replace('/(tabs)');
+          if (onBack) onBack();
+          else router.replace('/(tabs)');
         }
       }
     };
     fetchStory();
     return () => { isMounted = false; };
-  }, []);
+  }, [user, selectedLevelNum, tier]);
 
   if (loading) {
     return (
@@ -79,11 +98,24 @@ export default function ReadingUI({ title, tier }: { title: string, tier?: strin
     }, 1500);
   };
 
-  const handleFinish = (finalScore: number) => {
-    setPhase('done');
-    const xpGained = finalScore * 10;
-    updateProgress(xpGained);
-    completeModule(skill === 'reading' ? 'reading' : skill.toLowerCase());
+  const handleFinish = async (finalScore: number) => {
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
+
+    try {
+      setPhase('done');
+      const currentNum = selectedLevelNum || 1;
+      const xpGained = finalScore * 10;
+      await updateProgress(xpGained);
+      if (completeLevel) {
+        await completeLevel(currentNum);
+      }
+      await completeModule((skill || 'reading').toLowerCase());
+    } finally {
+      setTimeout(() => {
+        isAdvancingRef.current = false;
+      }, 1000);
+    }
   };
 
   if (phase === 'done') {
@@ -92,8 +124,22 @@ export default function ReadingUI({ title, tier }: { title: string, tier?: strin
         <Text style={styles.doneTitle}>Fantastic Reading! 🎉</Text>
         <Text style={styles.doneScore}>You answered {score} out of {story.questions.length} questions correctly.</Text>
         <Text style={styles.xpText}>+{score * 10} XP</Text>
-        <Pressable style={styles.btn} onPress={() => router.replace('/(tabs)')}>
-          <Text style={styles.btnText}>Return to Dashboard</Text>
+        <Pressable 
+          style={styles.btn} 
+          onPress={() => {
+            if (onNextLevel) {
+              setPhase('reading');
+              setCurrentQuestionIndex(0);
+              setSelectedOption(null);
+              setIsCorrect(null);
+              setScore(0);
+              onNextLevel();
+            } else {
+              router.replace('/(tabs)');
+            }
+          }}
+        >
+          <Text style={styles.btnText}>{onNextLevel ? "Next Level →" : "Return to Dashboard"}</Text>
         </Pressable>
       </View>
     );
@@ -141,12 +187,19 @@ export default function ReadingUI({ title, tier }: { title: string, tier?: strin
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.replace('/(tabs)')} style={styles.backBtn}>
-            <Text style={{fontSize: 20}}>✖️</Text>
+          <Pressable 
+            onPress={() => {
+              if (onBack) onBack();
+              else if (router.canGoBack()) router.back();
+              else router.replace('/(tabs)');
+            }} 
+            style={styles.backBtn}
+          >
+            <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#1E293B' }}>← Back</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>Story Time</Text>
+          <Text style={styles.headerTitle}>{title || "Story Time"}</Text>
           <Pressable onPress={() => setShowTranslations(!showTranslations)} style={styles.translateToggle}>
-            <Text style={{fontSize: 16}}>🌐</Text>
+            <Text style={{ fontSize: 16 }}>🌐</Text>
             <Text style={styles.translateToggleText}>{showTranslations ? "Hide" : "Translate"}</Text>
           </Pressable>
         </View>
@@ -180,35 +233,35 @@ export default function ReadingUI({ title, tier }: { title: string, tier?: strin
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 20 },
-  loadingText: { marginTop: 20, fontSize: 16, color: '#64748B', fontFamily: 'Inter-Medium' },
+  loadingText: { marginTop: 20, fontSize: 16, color: '#64748B' },
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   scrollContent: { padding: 20, paddingBottom: 60 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 30 },
-  backBtn: { padding: 8, backgroundColor: '#F1F5F9', borderRadius: 20 },
-  headerTitle: { fontSize: 18, fontFamily: 'Outfit-Bold', color: '#1E293B', textAlign: 'center' },
+  backBtn: { paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#F1F5F9', borderRadius: 16 },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#1E293B', textAlign: 'center' },
   translateToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFE4E6', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  translateToggleText: { color: '#E11D48', fontFamily: 'Inter-Bold', fontSize: 14 },
+  translateToggleText: { color: '#E11D48', fontWeight: 'bold', fontSize: 14 },
   
-  storyTitle: { fontSize: 28, fontFamily: 'Outfit-Bold', color: '#0F172A', textAlign: 'center', marginBottom: 8 },
-  storyTitleEnglish: { fontSize: 16, fontFamily: 'Inter-Medium', color: '#64748B', textAlign: 'center', marginBottom: 24, fontStyle: 'italic' },
+  storyTitle: { fontSize: 28, fontWeight: 'bold', color: '#0F172A', textAlign: 'center', marginBottom: 8 },
+  storyTitleEnglish: { fontSize: 16, color: '#64748B', textAlign: 'center', marginBottom: 24, fontStyle: 'italic' },
   
   storyContainer: { backgroundColor: 'white', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2, marginBottom: 30 },
   paragraphBox: { marginBottom: 20 },
-  paragraphNative: { fontSize: 22, fontFamily: 'Inter-Medium', color: '#1E293B', lineHeight: 34, marginBottom: 8 },
-  paragraphEnglish: { fontSize: 16, fontFamily: 'Inter-Regular', color: '#64748B', lineHeight: 24, fontStyle: 'italic', borderLeftWidth: 3, borderLeftColor: '#F43F5E', paddingLeft: 12 },
+  paragraphNative: { fontSize: 22, color: '#1E293B', lineHeight: 34, marginBottom: 8 },
+  paragraphEnglish: { fontSize: 16, color: '#64748B', lineHeight: 24, fontStyle: 'italic', borderLeftWidth: 3, borderLeftColor: '#F43F5E', paddingLeft: 12 },
   
-  btn: { backgroundColor: '#F43F5E', paddingVertical: 16, borderRadius: 16, alignItems: 'center', shadowColor: '#BE123C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  btnText: { color: 'white', fontSize: 18, fontFamily: 'Outfit-Bold' },
+  btn: { backgroundColor: '#F43F5E', paddingVertical: 16, paddingHorizontal: 24, borderRadius: 16, alignItems: 'center', shadowColor: '#BE123C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  btnText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
 
-  doneTitle: { fontSize: 28, fontFamily: 'Outfit-Bold', color: '#0F172A', marginBottom: 12 },
-  doneScore: { fontSize: 16, color: '#64748B', fontFamily: 'Inter-Medium', marginBottom: 20 },
-  xpText: { fontSize: 32, fontFamily: 'Outfit-Bold', color: '#F43F5E', marginBottom: 40 },
+  doneTitle: { fontSize: 28, fontWeight: 'bold', color: '#0F172A', marginBottom: 12 },
+  doneScore: { fontSize: 16, color: '#64748B', marginBottom: 20 },
+  xpText: { fontSize: 32, fontWeight: 'bold', color: '#F43F5E', marginBottom: 40 },
 
   quizCard: { backgroundColor: 'white', padding: 24, borderRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2, marginTop: 40, marginHorizontal: 20 },
-  questionText: { fontSize: 20, fontFamily: 'Outfit-Bold', color: '#1E293B', marginBottom: 24, lineHeight: 28 },
+  questionText: { fontSize: 20, fontWeight: 'bold', color: '#1E293B', marginBottom: 24, lineHeight: 28 },
   optionsContainer: { gap: 12 },
   optionBtn: { padding: 16, borderRadius: 16, borderWidth: 2, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
-  optionText: { fontSize: 16, fontFamily: 'Inter-Medium', color: '#334155' },
+  optionText: { fontSize: 16, color: '#334155' },
   optionCorrect: { borderColor: '#10B981', backgroundColor: '#ECFDF5' },
   textCorrect: { color: '#059669' },
   optionWrong: { borderColor: '#EF4444', backgroundColor: '#FEF2F2' },

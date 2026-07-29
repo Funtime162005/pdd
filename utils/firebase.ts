@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 // @ts-ignore
-import { getAuth, initializeAuth, getReactNativePersistence, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, initializeAuth, getReactNativePersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
@@ -23,7 +23,6 @@ let auth: any = null;
 
 if (isFirebaseConfigured) {
   try {
-    console.log("Initializing Firebase with config:", firebaseConfig);
     if (getApps().length === 0) {
       app = initializeApp(firebaseConfig);
     } else {
@@ -44,20 +43,6 @@ if (isFirebaseConfigured) {
 
 export { auth };
 
-export const signInWithGoogleFirebase = async () => {
-  if (!auth) {
-    throw new Error('Firebase Auth is not initialized. Please check your environment configuration.');
-  }
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({
-    prompt: 'select_account'
-  });
-  const result = await signInWithPopup(auth, provider);
-  return result.user;
-};
-
-import { signOut } from 'firebase/auth';
-
 export const signOutFirebase = async () => {
   if (auth) {
     try {
@@ -69,14 +54,14 @@ export const signOutFirebase = async () => {
 };
 
 export const signInWithEmailFirebase = async (email: string, password?: string) => {
-  if (!auth) throw new Error('Firebase Auth is not initialized. Please check your environment configuration.');
+  if (!auth) return null;
   if (!password) throw new Error('Password is required.');
   const result = await signInWithEmailAndPassword(auth, email, password);
   return result.user;
 };
 
 export const signUpWithEmailFirebase = async (email: string, password?: string) => {
-  if (!auth) throw new Error('Firebase Auth is not initialized. Please check your environment configuration.');
+  if (!auth) return null;
   if (!password) throw new Error('Password is required.');
   const result = await createUserWithEmailAndPassword(auth, email, password);
   return result.user;

@@ -91,7 +91,7 @@ export default function MascotAssistant({ message = "Ready to learn today? 🚀"
         <Pressable onPressIn={handlePressIn} onPressOut={handlePressOut}>
           <View style={styles.avatarRing}>
             <Image
-              source={require('../assets/avatars/monkey.png')}
+              source={require('../assets/avatars/monkey.jpg')}
               style={styles.monkeyImage}
             />
           </View>

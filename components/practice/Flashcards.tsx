@@ -1,13 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import Animated, { FadeInUp, useSharedValue, useAnimatedStyle, withTiming, SlideInRight } from 'react-native-reanimated';
 import { generateFlashcardLesson, Flashcard } from '../../utils/ai';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from 'expo-router';
 import { playAudio } from '../../utils/speech';
 
-export default function Flashcards({ skill, title, tier }: { skill: string, title: string, tier?: string }) {
-  const { user, updateProgress, completeModule } = useAuth();
+export default function Flashcards({ 
+  skill, 
+  title, 
+  tier, 
+  selectedLevelNum, 
+  onBack, 
+  onNextLevel 
+}: { 
+  skill: string; 
+  title: string; 
+  tier?: string; 
+  selectedLevelNum?: number; 
+  onBack?: () => void; 
+  onNextLevel?: () => void; 
+}) {
+  const { user, updateProgress, completeModule, completeLevel } = useAuth();
   const router = useRouter();
 
   const [cards, setCards] = useState<Flashcard[]>([]);
@@ -16,13 +30,19 @@ export default function Flashcards({ skill, title, tier }: { skill: string, titl
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Requirements state: must flip and listen before Next Card is enabled
+  const [hasFlipped, setHasFlipped] = useState(false);
+  const [hasHeard, setHasHeard] = useState(false);
+
   const isFlipped = useSharedValue(0);
 
   useEffect(() => {
     const fetchLesson = async () => {
       try {
+        setIsLoading(true);
         if (!user) return;
-        const activeLevel = tier || user.level;
+        const currentNum = selectedLevelNum || 1;
+        const activeLevel = `Level ${currentNum} (${tier || user.level || 'Beginner'})`;
         const generated = await generateFlashcardLesson(title, activeLevel, user.learningLanguage || "Tamil");
         setCards(generated);
       } catch (err) {
@@ -32,15 +52,42 @@ export default function Flashcards({ skill, title, tier }: { skill: string, titl
       }
     };
     fetchLesson();
-  }, [user]);
+  }, [user, selectedLevelNum, tier]);
+
+  // Reset card interaction state whenever active card index changes
+  useEffect(() => {
+    setHasFlipped(false);
+    setHasHeard(false);
+  }, [currentIndex]);
+
+  const currentCard = cards[currentIndex];
 
   const flipCard = () => {
-    isFlipped.value = withTiming(isFlipped.value === 0 ? 1 : 0, { duration: 300 });
+    const willFlipToBack = isFlipped.value === 0;
+    isFlipped.value = withTiming(willFlipToBack ? 1 : 0, { duration: 300 });
+
+    if (willFlipToBack && currentCard) {
+      setHasFlipped(true);
+      setHasHeard(true);
+      // Auto-play audio when card flips to reveal the native translation
+      playAudio(currentCard.term, user?.learningLanguage || 'tamil');
+    }
   };
 
+  const handleAudioPress = (e: any) => {
+    e.stopPropagation();
+    if (currentCard) {
+      setHasHeard(true);
+      playAudio(currentCard.term, user?.learningLanguage || 'tamil');
+    }
+  };
+
+  const canAdvance = hasFlipped && hasHeard;
+
   const handleNext = () => {
+    if (!canAdvance) return;
     if (currentIndex < cards.length - 1) {
-      isFlipped.value = 0; // reset flip
+      isFlipped.value = 0; // reset flip animation
       setTimeout(() => {
         setCurrentIndex(i => i + 1);
       }, 150);
@@ -49,11 +96,34 @@ export default function Flashcards({ skill, title, tier }: { skill: string, titl
     }
   };
 
-  const handleComplete = () => {
-    const xpGained = cards.length * 5; // 5 XP per flashcard
-    updateProgress(xpGained);
-    completeModule(skill.toLowerCase());
-    router.replace('/(tabs)');
+  const isAdvancingRef = useRef(false);
+
+  const handleComplete = async () => {
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
+
+    try {
+      const currentNum = selectedLevelNum || 1;
+      const xpGained = cards.length * 5; // 5 XP per flashcard
+      await updateProgress(xpGained);
+      if (completeLevel) {
+        await completeLevel(currentNum);
+      }
+      await completeModule(skill.toLowerCase());
+
+      if (onNextLevel) {
+        setIsFinished(false);
+        setCurrentIndex(0);
+        isFlipped.value = 0;
+        onNextLevel();
+      } else {
+        router.replace('/(tabs)');
+      }
+    } finally {
+      setTimeout(() => {
+        isAdvancingRef.current = false;
+      }, 1000);
+    }
   };
 
   const frontAnimatedStyle = useAnimatedStyle(() => {
@@ -84,20 +154,29 @@ export default function Flashcards({ skill, title, tier }: { skill: string, titl
         <Text style={{ fontSize: 18, color: '#4B5563', marginVertical: 10 }}>You reviewed {cards.length} terms.</Text>
         <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#F59E0B', marginBottom: 30 }}>+{xpGained} XP</Text>
         <Pressable style={styles.button} onPress={handleComplete}>
-          <Text style={styles.buttonText}>Continue</Text>
+          <Text style={styles.buttonText}>Continue →</Text>
         </Pressable>
       </Animated.View>
     );
   }
 
-  const currentCard = cards[currentIndex];
-
   return (
     <Animated.View key={currentIndex} entering={SlideInRight.springify()} style={{ flex: 1, alignItems: 'center' }}>
       
       <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 20 }}>
-        <Pressable onPress={() => { if (router.canGoBack()) { router.back(); } else { router.replace('/(tabs)'); } }} style={{ marginRight: 15 }}>
-          <Text style={{ fontSize: 24, color: '#065F46' }}>✕</Text>
+        <Pressable 
+          onPress={() => { 
+            if (onBack) { 
+              onBack(); 
+            } else if (router.canGoBack()) { 
+              router.back(); 
+            } else { 
+              router.replace('/(tabs)'); 
+            } 
+          }} 
+          style={{ marginRight: 15, paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#ECFDF5', borderRadius: 12 }}
+        >
+          <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#065F46' }}>← Back</Text>
         </Pressable>
         <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#065F46', flex: 1 }}>{title}</Text>
         <Text style={styles.counter}>{currentIndex + 1} / {cards.length}</Text>
@@ -106,27 +185,33 @@ export default function Flashcards({ skill, title, tier }: { skill: string, titl
       <Pressable style={styles.cardContainer} onPress={flipCard}>
         {/* Front of Card */}
         <Animated.View style={[styles.card, frontAnimatedStyle]}>
-          <Text style={styles.cardHint}>Tap to translate</Text>
+          <Text style={styles.cardHint}>👆 Tap to translate & hear</Text>
           {currentCard.emoji ? <Text style={{ fontSize: 80, marginBottom: 20 }}>{currentCard.emoji}</Text> : null}
           <Text style={styles.englishText}>{currentCard.translation}</Text>
         </Animated.View>
 
         {/* Back of Card */}
         <Animated.View style={[styles.card, styles.cardBack, backAnimatedStyle]}>
-          <Text style={styles.cardHint}>Did you get it right?</Text>
+          <Text style={styles.cardHint}>🔊 Pronunciation Loaded</Text>
           {currentCard.emoji ? <Text style={{ fontSize: 80, marginBottom: 20 }}>{currentCard.emoji}</Text> : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Text style={styles.nativeText}>{currentCard.term}</Text>
-            <Pressable onPress={(e) => { e.stopPropagation(); playAudio(currentCard.term, user?.learningLanguage || 'tamil'); }} style={{ padding: 10, backgroundColor: '#E0F2FE', borderRadius: 20 }}>
-              <Text style={{ fontSize: 24 }}>🎧</Text>
+            <Pressable onPress={handleAudioPress} style={{ padding: 12, backgroundColor: '#E0F2FE', borderRadius: 24 }}>
+              <Text style={{ fontSize: 28 }}>🎧</Text>
             </Pressable>
           </View>
         </Animated.View>
       </Pressable>
 
       <View style={styles.actionRow}>
-        <Pressable style={styles.button} onPress={handleNext}>
-          <Text style={styles.buttonText}>Next Card ➡️</Text>
+        <Pressable 
+          style={[styles.button, !canAdvance && { backgroundColor: '#9CA3AF', opacity: 0.65 }]} 
+          onPress={handleNext}
+          disabled={!canAdvance}
+        >
+          <Text style={styles.buttonText}>
+            {canAdvance ? 'Next Card ➡️' : '👆 Tap Card to Reveal & Hear First'}
+          </Text>
         </Pressable>
       </View>
 
@@ -148,22 +233,61 @@ const styles = StyleSheet.create({
     ...(StyleSheet.absoluteFill as any),
     backgroundColor: 'white',
     borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 30,
-    boxShadow: '0px 20px 40px rgba(0,0,0,0.1)',
-    elevation: 10,
-    backfaceVisibility: 'hidden'
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+    backfaceVisibility: 'hidden',
   },
   cardBack: {
-    backgroundColor: '#ECFDF5',
-    borderWidth: 2,
-    borderColor: '#10B981'
+    backgroundColor: '#F0FDF4',
   },
-  nativeText: { fontSize: 48, fontWeight: 'bold', color: '#065F46', textAlign: 'center' },
-  englishText: { fontSize: 36, fontWeight: 'bold', color: '#1F2937', textAlign: 'center' },
-  cardHint: { position: 'absolute', top: 20, fontSize: 14, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 1 },
-  actionRow: { marginTop: 40, width: '100%' },
-  button: { backgroundColor: '#10B981', padding: 18, borderRadius: 16, alignItems: 'center', width: '100%' },
-  buttonText: { color: 'white', fontSize: 18, fontWeight: 'bold' }
+  cardHint: {
+    position: 'absolute',
+    top: 20,
+    fontSize: 14,
+    color: '#9CA3AF',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    fontWeight: '600',
+  },
+  englishText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    textAlign: 'center',
+  },
+  nativeText: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#059669',
+    textAlign: 'center',
+  },
+  actionRow: {
+    marginTop: 30,
+    width: '100%',
+    alignItems: 'center',
+  },
+  button: {
+    backgroundColor: '#059669',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 16,
+    width: '100%',
+    alignItems: 'center',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
 });

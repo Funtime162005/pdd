@@ -1,15 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeIn, FadeInUp, FadeInDown, useSharedValue, useAnimatedStyle, withSpring, withSequence, withTiming, withRepeat, Easing } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInUp, FadeInDown, useSharedValue, useAnimatedStyle, withSpring, withSequence, withTiming, withRepeat } from 'react-native-reanimated';
 import { useAuth } from '../context/AuthContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SENTENCE_GAME_POOLS } from '../constants/translations';
-import { Colors, Fonts, Radius, Shadow } from '../components/KidsTheme';
+import { Colors, Fonts, Radius } from '../components/KidsTheme';
+import LevelsListUI from '../components/practice/LevelsListUI';
+import { getSentenceQuestions } from '../utils/gameLevels';
 
 // Game Complete
-function GameComplete({ score, onBack }: { score: number; onBack: () => void }) {
+function GameComplete({ 
+  score, 
+  levelNum, 
+  onNextLevel, 
+  onBack 
+}: { 
+  score: number; 
+  levelNum: number; 
+  onNextLevel: () => void; 
+  onBack: () => void; 
+}) {
   const scale = useSharedValue(0.5);
   useEffect(() => { scale.value = withSpring(1, { damping: 8 }); }, []);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -20,14 +31,21 @@ function GameComplete({ score, onBack }: { score: number; onBack: () => void }) 
       <Animated.View style={[gc.card, style]}>
         <Text style={gc.emoji}>🧩</Text>
         <Text style={gc.congrats}>Builder! 🔥</Text>
-        <Text style={gc.title}>Time Attack Done!</Text>
+        <Text style={gc.title}>Level {levelNum} Complete!</Text>
         <View style={gc.xpBadge}><Text style={gc.xpText}>⭐ +{score} XP Earned!</Text></View>
         <Text style={gc.message}>{score >= 60 ? 'Speed demon! You crushed it! ⚡' : score >= 30 ? 'Great timing! Keep building! 🏗️' : 'Practice makes perfect! Try again! 💪'}</Text>
-        <Pressable style={gc.btn} onPress={onBack}>
-          <LinearGradient colors={['#6366F1', '#8B5CF6']} style={gc.btnGrad}>
-            <Text style={gc.btnText}>🎮 Back to Games</Text>
-          </LinearGradient>
-        </Pressable>
+        <View style={{ width: '100%', gap: 10 }}>
+          <Pressable style={gc.btn} onPress={onNextLevel}>
+            <LinearGradient colors={['#6366F1', '#8B5CF6']} style={gc.btnGrad}>
+              <Text style={gc.btnText}>Next Level ➡️</Text>
+            </LinearGradient>
+          </Pressable>
+          <Pressable style={[gc.btn, { marginTop: 4 }]} onPress={onBack}>
+            <View style={{ paddingVertical: 14, alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: Radius.pill }}>
+              <Text style={{ fontFamily: Fonts.heading, fontSize: 16, color: '#374151' }}>🗺️ All 1000 Levels</Text>
+            </View>
+          </Pressable>
+        </View>
       </Animated.View>
     </View>
   );
@@ -87,262 +105,260 @@ const tr = StyleSheet.create({
   text: { fontFamily: Fonts.heading, fontSize: 16, color: Colors.purple, zIndex: 1 },
 });
 
-export default function GameSentenceScreen() {
-  const router = useRouter();
-  const { user, updateProgress } = useAuth();
-
+function GameSentencePlay({ 
+  selectedLevelNum, 
+  onBack, 
+  onNextLevel 
+}: { 
+  selectedLevelNum: number; 
+  onBack: () => void; 
+  onNextLevel: () => void; 
+}) {
+  const { user, updateProgress, completeLevel } = useAuth();
   const lang = user?.learningLanguage || 'tamil';
-  const QUESTION_POOL = SENTENCE_GAME_POOLS[lang] || SENTENCE_GAME_POOLS['tamil'];
   const MAX_TIME = 15;
 
-  const [questions, setQuestions] = useState<typeof QUESTION_POOL>([]);
+  const [questions, setQuestions] = useState<Array<{ english: string; words: string[] }>>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedWords, setSelectedWords] = useState<string[]>([]);
   const [availableWords, setAvailableWords] = useState<string[]>([]);
   const [timeLeft, setTimeLeft] = useState(MAX_TIME);
   const [score, setScore] = useState(0);
   const [gameFinished, setGameFinished] = useState(false);
-  const [status, setStatus] = useState<'playing' | 'correct' | 'wrong' | 'timeout'>('playing');
+  const [resultState, setResultState] = useState<'idle' | 'correct' | 'wrong'>('idle');
 
-  const checkBtnScale = useSharedValue(1);
-  const checkBtnStyle = useAnimatedStyle(() => ({ transform: [{ scale: checkBtnScale.value }] }));
+  const timerRef = useRef<any>(null);
+  const isAdvancingRef = useRef(false);
 
   useEffect(() => {
-    const shuffled = [...QUESTION_POOL].sort(() => Math.random() - 0.5);
-    setQuestions(shuffled.slice(0, 4));
-  }, []);
+    const generated = getSentenceQuestions(selectedLevelNum, lang);
+    setQuestions(generated);
+    setCurrentIndex(0);
+    setScore(0);
+    setGameFinished(false);
+  }, [selectedLevelNum, user, lang]);
 
   const currentQ = questions[currentIndex];
 
   useEffect(() => {
-    if (questions.length > 0 && currentIndex < questions.length) {
-      setAvailableWords([...questions[currentIndex].words].sort(() => Math.random() - 0.5));
-      setSelectedWords([]);
-      setTimeLeft(MAX_TIME);
-      setStatus('playing');
-    }
-  }, [currentIndex, questions]);
+    if (!currentQ || gameFinished) return;
+    const shuffled = [...currentQ.words].sort(() => Math.random() - 0.5);
+    setAvailableWords(shuffled);
+    setSelectedWords([]);
+    setResultState('idle');
+    setTimeLeft(MAX_TIME);
 
-  useEffect(() => {
-    if (status !== 'playing' || gameFinished) return;
-    if (timeLeft <= 0) { handleWrong('timeout'); return; }
-    const timer = setInterval(() => setTimeLeft(t => t - 1), 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft, status, gameFinished]);
+    clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) {
+          clearInterval(timerRef.current);
+          handleTimeOut();
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
 
-  const selectWord = (word: string, wordIndex: number) => {
-    if (status !== 'playing') return;
-    setSelectedWords([...selectedWords, word]);
-    setAvailableWords(prev => { const next = [...prev]; next.splice(wordIndex, 1); return next; });
-  };
+    return () => clearInterval(timerRef.current);
+  }, [currentIndex, gameFinished, questions]);
 
-  const removeWord = (word: string, wordIndex: number) => {
-    if (status !== 'playing') return;
-    setSelectedWords(prev => { const next = [...prev]; next.splice(wordIndex, 1); return next; });
-    setAvailableWords(prev => [...prev, word]);
-  };
+  const handleFinish = async (finalScore: number) => {
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
 
-  const checkAnswer = () => {
-    const built = selectedWords.join(' ');
-    if (built === currentQ.original) {
-      setStatus('correct');
-      setScore(s => s + (timeLeft > 10 ? 20 : 10));
-      nextQuestion();
-    } else {
-      handleWrong('wrong');
-    }
-  };
-
-  const handleWrong = (state: 'wrong' | 'timeout') => {
-    setStatus(state);
-    nextQuestion();
-  };
-
-  const nextQuestion = () => {
-    setTimeout(() => {
-      if (currentIndex < questions.length - 1) {
-        setCurrentIndex(i => i + 1);
-      } else {
-        setGameFinished(true);
-        if (user) updateProgress(score);
+    try {
+      setGameFinished(true);
+      if (user) {
+        await updateProgress(finalScore);
+        if (selectedLevelNum) {
+          try {
+            const saved = await AsyncStorage.getItem('@game_sentence_completed');
+            const prevMax = saved ? parseInt(saved, 10) : 0;
+            if (selectedLevelNum > prevMax) {
+              await AsyncStorage.setItem('@game_sentence_completed', selectedLevelNum.toString());
+            }
+          } catch(e) {}
+        }
       }
-    }, 1500);
+    } finally {
+      setTimeout(() => {
+        isAdvancingRef.current = false;
+      }, 1000);
+    }
   };
 
-  if (gameFinished) return <GameComplete score={score} onBack={() => router.replace('/games')} />;
+  const handleTimeOut = () => {
+    setResultState('wrong');
+    setTimeout(() => advanceQuestion(score), 1200);
+  };
+
+  const handleSelectWord = (word: string, index: number) => {
+    if (resultState !== 'idle' || !currentQ) return;
+    const newSel = [...selectedWords, word];
+    const newAvail = availableWords.filter((_, i) => i !== index);
+    setSelectedWords(newSel);
+    setAvailableWords(newAvail);
+
+    if (newSel.length === currentQ.words.length) {
+      clearInterval(timerRef.current);
+      const isCorrect = newSel.join(' ') === currentQ.words.join(' ');
+      const bonus = timeLeft > 5 ? 15 : 10;
+      const gained = isCorrect ? bonus : 0;
+      const nextScore = score + gained;
+      setResultState(isCorrect ? 'correct' : 'wrong');
+      if (isCorrect) setScore(nextScore);
+
+      setTimeout(() => advanceQuestion(nextScore), 1200);
+    }
+  };
+
+  const handleDeselectWord = (word: string, index: number) => {
+    if (resultState !== 'idle') return;
+    const newSel = selectedWords.filter((_, i) => i !== index);
+    setSelectedWords(newSel);
+    setAvailableWords([...availableWords, word]);
+  };
+
+  const advanceQuestion = (currentScore: number) => {
+    if (currentIndex < questions.length - 1) {
+      setCurrentIndex(i => i + 1);
+    } else {
+      clearInterval(timerRef.current);
+      handleFinish(currentScore);
+    }
+  };
+
+  if (gameFinished) {
+    return (
+      <GameComplete 
+        score={score} 
+        levelNum={selectedLevelNum}
+        onNextLevel={onNextLevel}
+        onBack={onBack} 
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#EEF2FF', '#F5F3FF', '#EDE9FE']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['#EEF2FF', '#E0E7FF', '#F5F3FF']} style={StyleSheet.absoluteFill} />
 
-      {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.replace('/games')} style={styles.backBtn}>
-          <Text style={styles.backTxt}>← Back</Text>
-        </Pressable>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>🧩 Sentence Builder</Text>
-          <View style={styles.dots}>
-            {Array.from({ length: questions.length }).map((_, i) => (
-              <View key={i} style={[styles.dot, i < currentIndex && styles.dotDone, i === currentIndex && styles.dotActive]} />
-            ))}
-          </View>
-        </View>
-        <View style={styles.scorePill}><Text style={styles.scoreTxt}>⭐ {score}</Text></View>
+        <Pressable onPress={onBack} style={styles.backBtn}><Text style={styles.backTxt}>← Back</Text></Pressable>
+        <Text style={styles.headerTitle}>🧩 Level {selectedLevelNum}</Text>
+        <View style={styles.scorePill}><Text style={styles.scoreText}>⭐ {score}</Text></View>
       </View>
 
       <View style={styles.content}>
         {currentQ && (
-          <Animated.View key={currentIndex} entering={FadeInUp.springify()} style={styles.playCard}>
-
-            {/* Timer */}
+          <>
             <TimerRing timeLeft={timeLeft} maxTime={MAX_TIME} />
 
-            {/* English prompt */}
-            <View style={styles.promptBox}>
-              <Text style={styles.promptLabel}>Translate this ⬇️</Text>
-              <Text style={styles.promptText}>"{currentQ.english}"</Text>
-            </View>
+            <Animated.View entering={FadeInDown.springify()} style={styles.englishCard}>
+              <Text style={styles.englishText}>"{currentQ.english}"</Text>
+              <Text style={styles.promptSub}>Build the sentence in language 👇</Text>
+            </Animated.View>
 
-            {/* Drop zone */}
-            <View style={[styles.dropZone, status === 'correct' && styles.dropZoneCorrect, status === 'wrong' && styles.dropZoneWrong, status === 'timeout' && styles.dropZoneWrong]}>
+            <View style={[
+              styles.targetSlot,
+              resultState === 'correct' && styles.targetCorrect,
+              resultState === 'wrong' && styles.targetWrong,
+            ]}>
               {selectedWords.length === 0 ? (
-                <Text style={styles.dropPlaceholder}>Tap words below to build ✍️</Text>
+                <Text style={styles.placeholderText}>Tap words below to arrange...</Text>
               ) : (
-                <View style={styles.chipRow}>
-                  {selectedWords.map((word, i) => (
-                    <Pressable key={i} onPress={() => removeWord(word, i)} style={styles.selectedChip}>
-                      <Text style={styles.selectedChipText}>{word}</Text>
+                <View style={styles.wordRow}>
+                  {selectedWords.map((w, i) => (
+                    <Pressable key={i} onPress={() => handleDeselectWord(w, i)} style={styles.selectedPill}>
+                      <Text style={styles.selectedPillText}>{w}</Text>
                     </Pressable>
                   ))}
                 </View>
               )}
             </View>
 
-            {/* Feedback */}
-            {status === 'correct' && (
-              <Animated.View entering={FadeIn.duration(300)} style={styles.feedbackSuccess}>
-                <Text style={styles.feedbackText}>✅ Excellent! +{timeLeft > 10 ? 20 : 10} XP!</Text>
-              </Animated.View>
-            )}
-            {(status === 'wrong' || status === 'timeout') && (
-              <Animated.View entering={FadeIn.duration(300)} style={styles.feedbackError}>
-                <Text style={styles.feedbackText}>{status === 'timeout' ? '⏰ Time\'s up!' : '❌ Not quite!'}</Text>
-              </Animated.View>
-            )}
-
-            {/* Word bank */}
-            <Text style={styles.bankLabel}>Word Bank 📦</Text>
-            <View style={styles.wordBank}>
-              {availableWords.map((word, i) => (
-                <Pressable key={i} onPress={() => selectWord(word, i)} style={styles.bankChip}>
-                  <LinearGradient colors={['#6366F1', '#8B5CF6']} style={styles.bankChipGrad}>
-                    <Text style={styles.bankChipText}>{word}</Text>
-                  </LinearGradient>
+            <Animated.View key={currentIndex} entering={FadeInUp.delay(200).springify()} style={styles.wordBank}>
+              {availableWords.map((w, i) => (
+                <Pressable key={i} onPress={() => handleSelectWord(w, i)} style={styles.wordTile}>
+                  <Text style={styles.wordTileText}>{w}</Text>
                 </Pressable>
               ))}
-            </View>
-
-          </Animated.View>
+            </Animated.View>
+          </>
         )}
-      </View>
-
-      {/* Check button */}
-      <View style={styles.footer}>
-        <Animated.View style={checkBtnStyle}>
-          <Pressable
-            style={[styles.checkBtn, (availableWords.length > 0 || status !== 'playing') && styles.checkBtnDisabled]}
-            onPress={checkAnswer}
-            onPressIn={() => { checkBtnScale.value = withSpring(0.95, { damping: 10 }); }}
-            onPressOut={() => { checkBtnScale.value = withSpring(1, { damping: 10 }); }}
-            disabled={availableWords.length > 0 || status !== 'playing'}
-          >
-            <LinearGradient
-              colors={availableWords.length > 0 || status !== 'playing' ? ['#C4B5FD', '#A78BFA'] as [string,string] : ['#6366F1', '#8B5CF6'] as [string,string]}
-              style={styles.checkGrad}
-            >
-              <Text style={styles.checkText}>✅ Check Answer</Text>
-            </LinearGradient>
-          </Pressable>
-        </Animated.View>
       </View>
     </View>
   );
 }
 
+export default function GameSentenceScreen() {
+  const { user } = useAuth();
+  const [selectedLevelNum, setSelectedLevelNum] = useState<number | null>(null);
+  const [selectedTier, setSelectedTier] = useState<string | null>(null);
+
+  if (!selectedLevelNum) {
+    let tier = selectedTier || 'Beginner';
+    if (!selectedTier && user?.level) {
+      if (user.level.includes('Pro') || user.level.includes('Advanced')) tier = 'Pro';
+      else if (user.level.includes('Intermediate')) tier = 'Intermediate';
+    }
+    return (
+      <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+        <LevelsListUI 
+          gameTitle="Sentence Builder"
+          gameIcon="🧩"
+          accentColor="#7C3AED"
+          gameKey="sentence"
+          onSelectLevel={(num) => { 
+            setSelectedLevelNum(num); 
+          }} 
+        />
+      </View>
+    );
+  }
+
+  return (
+    <GameSentencePlay 
+      key={selectedLevelNum}
+      selectedLevelNum={selectedLevelNum} 
+      onBack={() => setSelectedLevelNum(null)}
+      onNextLevel={() => setSelectedLevelNum(prev => (prev ? prev + 1 : 2))}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  header: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingTop: 56, gap: 10 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, paddingTop: 56 },
   backBtn: { backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: Radius.pill, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 2, borderColor: '#E5E7EB' },
   backTxt: { fontFamily: Fonts.body, fontSize: 14, color: Colors.textMid },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  headerTitle: { fontFamily: Fonts.heading, fontSize: 16, color: Colors.textDark, marginBottom: 6 },
-  dots: { flexDirection: 'row', gap: 6 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#E5E7EB' },
-  dotActive: { backgroundColor: Colors.purple, transform: [{ scale: 1.2 }] },
-  dotDone: { backgroundColor: Colors.green },
-  scorePill: { backgroundColor: Colors.purpleLight, borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 2, borderColor: Colors.purple },
-  scoreTxt: { fontFamily: Fonts.body, fontSize: 14, color: Colors.purple },
+  headerTitle: { fontFamily: Fonts.heading, fontSize: 18, color: Colors.textDark },
+  scorePill: { backgroundColor: Colors.yellowLight, borderRadius: Radius.pill, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 2, borderColor: Colors.yellow },
+  scoreText: { fontFamily: Fonts.body, fontSize: 14, color: Colors.yellowDark },
 
-  content: { flex: 1, padding: 16 },
-  playCard: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: Radius.xl,
-    padding: 20,
-    gap: 16,
-    flex: 1,
-    borderWidth: 2.5,
-    borderColor: Colors.purpleLight,
-    ...(Platform.OS === 'web' ? { boxShadow: '0px 8px 24px rgba(99,102,241,0.12)' } : { ...Shadow.card }),
+  content: { flex: 1, padding: 20, justifyContent: 'space-around' },
+  englishCard: { backgroundColor: '#FFFFFF', borderRadius: Radius.xl, padding: 24, alignItems: 'center', borderWidth: 2.5, borderColor: Colors.purpleLight },
+  englishText: { fontFamily: Fonts.heading, fontSize: 22, color: Colors.textDark, textAlign: 'center', marginBottom: 6 },
+  promptSub: { fontFamily: Fonts.bodyReg, fontSize: 14, color: Colors.textMid },
+
+  targetSlot: {
+    minHeight: 80, backgroundColor: 'rgba(255,255,255,0.8)', borderRadius: Radius.xl,
+    padding: 14, justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2.5, borderColor: '#C7D2FE', borderStyle: 'dashed',
   },
+  targetCorrect: { borderColor: Colors.green, backgroundColor: Colors.greenLight, borderStyle: 'solid' },
+  targetWrong: { borderColor: Colors.red, backgroundColor: Colors.redLight, borderStyle: 'solid' },
+  placeholderText: { fontFamily: Fonts.bodyReg, fontSize: 15, color: '#A5B4FC' },
+  wordRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  selectedPill: { backgroundColor: Colors.purple, borderRadius: Radius.md, paddingHorizontal: 14, paddingVertical: 8 },
+  selectedPillText: { fontFamily: Fonts.heading, fontSize: 17, color: '#FFFFFF' },
 
-  promptBox: {
-    backgroundColor: Colors.purpleLight,
-    borderRadius: Radius.lg,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: Colors.purple + '40',
-  },
-  promptLabel: { fontFamily: Fonts.bodySemi, fontSize: 12, color: Colors.purple, letterSpacing: 0.5, marginBottom: 6 },
-  promptText: { fontFamily: Fonts.heading, fontSize: 20, color: Colors.textDark },
-
-  dropZone: {
-    minHeight: 70,
-    borderRadius: Radius.lg,
-    borderWidth: 2.5,
-    borderStyle: 'dashed',
-    borderColor: Colors.purple + '60',
-    backgroundColor: Colors.bgMuted,
-    padding: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dropZoneCorrect: { borderColor: Colors.green, backgroundColor: Colors.greenLight, borderStyle: 'solid' },
-  dropZoneWrong: { borderColor: Colors.red, backgroundColor: Colors.redLight, borderStyle: 'solid' },
-  dropPlaceholder: { fontFamily: Fonts.bodyReg, fontSize: 14, color: Colors.textLight, fontStyle: 'italic' },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
-  selectedChip: {
-    backgroundColor: Colors.purple,
-    borderRadius: Radius.pill,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    ...(Platform.OS === 'web' ? { boxShadow: '0px 3px 8px rgba(168,85,247,0.35)' } : {}),
-  },
-  selectedChipText: { fontFamily: Fonts.body, fontSize: 16, color: '#FFFFFF' },
-
-  feedbackSuccess: { backgroundColor: Colors.greenLight, borderRadius: Radius.lg, padding: 10, borderWidth: 2, borderColor: Colors.green, alignItems: 'center' },
-  feedbackError: { backgroundColor: Colors.redLight, borderRadius: Radius.lg, padding: 10, borderWidth: 2, borderColor: Colors.red, alignItems: 'center' },
-  feedbackText: { fontFamily: Fonts.body, fontSize: 15, color: Colors.textDark },
-
-  bankLabel: { fontFamily: Fonts.bodySemi, fontSize: 12, color: Colors.textMid, letterSpacing: 0.5 },
   wordBank: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
-  bankChip: { borderRadius: Radius.pill, overflow: 'hidden' },
-  bankChipGrad: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: Radius.pill },
-  bankChipText: { fontFamily: Fonts.body, fontSize: 16, color: '#FFFFFF' },
-
-  footer: { padding: 16, paddingBottom: 32 },
-  checkBtn: { borderRadius: Radius.pill, overflow: 'hidden' },
-  checkBtnDisabled: { opacity: 0.7 },
-  checkGrad: { paddingVertical: 18, alignItems: 'center', borderRadius: Radius.pill },
-  checkText: { fontFamily: Fonts.heading, fontSize: 18, color: '#FFFFFF' },
+  wordTile: {
+    backgroundColor: '#FFFFFF', borderRadius: Radius.lg, paddingHorizontal: 18, paddingVertical: 12,
+    borderWidth: 2.5, borderColor: '#E0E7FF',
+    ...(Platform.OS === 'web' ? { boxShadow: '0px 4px 12px rgba(99,102,241,0.15)' } : { elevation: 4 }),
+  },
+  wordTileText: { fontFamily: Fonts.body, fontSize: 18, color: Colors.textDark },
 });

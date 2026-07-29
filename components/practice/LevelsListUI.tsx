@@ -1,84 +1,158 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, FlatList, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 
 type Props = {
+  gameTitle?: string;
+  gameIcon?: string;
+  accentColor?: string;
+  gameKey?: string;
   currentLevelStr?: string;
+  initialTab?: string;
   onSelectLevel: (levelNum: number, tier: string) => void;
 };
 
-export default function LevelsListUI({ currentLevelStr, onSelectLevel }: Props) {
+const ITEM_HEIGHT = 110;
+
+export default function LevelsListUI({
+  gameTitle = 'Curriculum Map',
+  gameIcon = '🗺️',
+  accentColor = '#0284C7',
+  gameKey = 'general',
+  currentLevelStr,
+  initialTab,
+  onSelectLevel
+}: Props) {
   const router = useRouter();
-  const match = currentLevelStr?.match(/Level (\d+)/);
-  const userMaxLevel = match ? parseInt(match[1], 10) : 1;
-  const userTier = currentLevelStr?.split(' - ')[0] || 'Beginner';
+  // The tier being viewed right now — this decides whether content shown at each
+  // level is alphabet/word-based (Beginner), sentence/tough-word (Intermediate)
+  // or hard-word/hard-sentence (Pro). Must come from initialTab (falls back to
+  // currentLevelStr), never hardcoded — each tier has its own 1-1000 level map.
+  const userTier = initialTab || currentLevelStr?.split(' - ')[0] || 'Beginner';
+  const [completedMaxLevel, setCompletedMaxLevel] = useState<number>(0);
+
+  useEffect(() => {
+    AsyncStorage.getItem(`@game_${gameKey}_${userTier}_completed`).then(val => {
+      setCompletedMaxLevel(val ? parseInt(val, 10) : 0);
+    });
+  }, [gameKey, userTier]);
 
   // Generate 1000 levels
   const levels = Array.from({ length: 1000 }, (_, i) => i + 1);
 
   const renderItem = ({ item, index }: { item: number; index: number }) => {
-    // Only unlocking up to user's max level for their current tier
-    const isUnlocked = item <= userMaxLevel;
-    const isCurrent = item === userMaxLevel;
+    const isCompleted = item <= completedMaxLevel;
+    const isCurrent = item === completedMaxLevel + 1 || (completedMaxLevel === 0 && item === 1);
+    const isUnlocked = isCompleted || isCurrent;
+    
+    const x1 = Math.sin(index * 0.6) * 70;
+    const x2 = Math.sin((index + 1) * 0.6) * 70;
 
-    // Create a curved path effect using a sine wave
-    const offsetX = Math.sin(index * 0.6) * 70; // 70 is the amplitude (how far left/right it swings)
+    const dx = x2 - x1;
+    const dy = ITEM_HEIGHT;
+    const length = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+    // Color theme logic
+    let nodeBg = '#F8FAFC';
+    let nodeBorder = '#E2E8F0';
+    let textColor = '#CBD5E1';
+    let badgeText = '';
+
+    if (isCompleted) {
+      nodeBg = '#22C55E'; // Solid Vibrant Green for Completed Lesson
+      nodeBorder = '#16A34A';
+      textColor = '#FFFFFF';
+      badgeText = '✓';
+    } else if (isCurrent) {
+      nodeBg = '#FFFFFF'; // Bright White with theme border for Current Active Lesson
+      nodeBorder = accentColor;
+      textColor = accentColor;
+      badgeText = '⭐';
+    }
+
+    const lineColor = isCompleted ? '#22C55E' : isCurrent ? accentColor + '88' : '#E2E8F0';
 
     return (
-      <Animated.View entering={FadeIn.delay(Math.min(index * 10, 500))} style={[styles.itemContainer, { transform: [{ translateX: offsetX }] }]}>
-        <Pressable
-          style={[
-            styles.levelBtn,
-            isUnlocked ? styles.unlockedBtn : styles.lockedBtn,
-            isCurrent && styles.currentBtn
-          ]}
-          onPress={() => {
-            if (isUnlocked) onSelectLevel(item, userTier);
-          }}
-        >
-          <Text style={[
-            styles.levelText,
-            isUnlocked ? styles.unlockedText : styles.lockedText,
-            isCurrent && styles.currentText
-          ]}>
-            {item}
-          </Text>
-        </Pressable>
-        {/* Draw a connecting line to the next level */}
+      <View style={styles.itemWrapper}>
+        {/* Continuous Connected Path Line to Next Node */}
         {item < 1000 && (
           <View 
             style={[
-              styles.connector, 
-              isUnlocked ? styles.connectorUnlocked : styles.connectorLocked,
-              // Calculate slight rotation to aim at the next node
-              { transform: [{ rotate: `${Math.cos(index * 0.6) * -30}deg` }] }
+              styles.connectorLine,
+              {
+                width: length,
+                backgroundColor: lineColor,
+                transform: [
+                  { translateX: x1 },
+                  { rotate: `${angle}deg` }
+                ]
+              }
             ]} 
           />
         )}
-      </Animated.View>
+
+        {/* Level Node Button */}
+        <View style={[styles.nodeContainer, { transform: [{ translateX: x1 }] }]}>
+          <Pressable
+            disabled={!isUnlocked}
+            style={[
+              styles.levelBtn,
+              { backgroundColor: nodeBg, borderColor: nodeBorder },
+              isCurrent && [styles.currentBtnShadow, { shadowColor: accentColor }],
+              !isUnlocked && styles.lockedBtnStyle
+            ]}
+            onPress={() => {
+              if (isUnlocked) {
+                onSelectLevel(item, userTier);
+              }
+            }}
+          >
+            {isUnlocked ? (
+              <Text style={[styles.levelText, { color: textColor }]}>
+                {item}
+              </Text>
+            ) : (
+              <Text style={styles.lockIcon}>🔒</Text>
+            )}
+
+            {badgeText ? (
+              <View style={[styles.badgePill, isCompleted ? styles.completedBadge : styles.currentBadge]}>
+                <Text style={styles.badgeTxt}>{badgeText}</Text>
+              </View>
+            ) : null}
+          </Pressable>
+        </View>
+      </View>
     );
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: accentColor + '33' }]}>
         <Pressable style={styles.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace('/')}>
           <Text style={styles.backBtnText}>← Back</Text>
         </Pressable>
         <View style={styles.titleContainer}>
-          <Text style={styles.headerTitle}>Curriculum Map</Text>
-          <Text style={styles.headerSub}>Select an unlocked level to begin</Text>
+          <Text style={[styles.headerTitle, { color: '#0F172A' }]}>{gameIcon} {gameTitle}</Text>
+          <Text style={styles.headerSub}>
+            Completed: <Text style={{ color: '#22C55E', fontWeight: '800' }}>{completedMaxLevel}</Text> / 1000 Levels
+          </Text>
         </View>
       </View>
 
       <FlatList
-        key={userTier} // Force re-render of list when tier changes
         data={levels}
         keyExtractor={item => item.toString()}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        getItemLayout={(_, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
       />
     </View>
   );
@@ -90,92 +164,102 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   header: {
-    padding: 24,
+    padding: 20,
+    paddingTop: 50,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomWidth: 2,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
   backBtn: {
-    marginRight: 16,
-    padding: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
   },
   backBtnText: {
-    color: '#0EA5E9',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#475569',
   },
   titleContainer: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '800',
-    color: '#0F172A',
   },
   headerSub: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#64748B',
-    marginTop: 4,
+    marginTop: 2,
   },
   listContent: {
-    padding: 40,
+    paddingVertical: 40,
     alignItems: 'center',
   },
-  itemContainer: {
+  itemWrapper: {
+    height: ITEM_HEIGHT,
+    width: '100%',
     alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  connectorLine: {
+    position: 'absolute',
+    top: 34,
+    left: '50%',
+    height: 6,
+    borderRadius: 3,
+    zIndex: 1,
+    transformOrigin: '0% 50%',
+  },
+  nodeContainer: {
+    zIndex: 2,
   },
   levelBtn: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 3.5,
     justifyContent: 'center',
     alignItems: 'center',
+    ...(Platform.OS === 'web' ? { boxShadow: '0px 8px 20px rgba(0,0,0,0.12)' } : { elevation: 6 }),
+  },
+  currentBtnShadow: {
     borderWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    backgroundColor: '#fff',
+    ...(Platform.OS === 'web' ? { boxShadow: '0px 10px 25px rgba(2,132,199,0.35)' } : { elevation: 10 }),
   },
-  unlockedBtn: {
-    borderColor: '#0EA5E9',
-  },
-  currentBtn: {
-    borderColor: '#22C55E',
-    backgroundColor: '#DCFCE7',
-    transform: [{ scale: 1.1 }],
-  },
-  lockedBtn: {
-    borderColor: '#CBD5E1',
-    backgroundColor: '#F1F5F9',
-    shadowOpacity: 0,
-    elevation: 0,
+  lockedBtnStyle: {
+    opacity: 0.7,
   },
   levelText: {
-    fontSize: 24,
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  lockIcon: {
+    fontSize: 22,
+  },
+  badgePill: {
+    position: 'absolute',
+    bottom: -6,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  completedBadge: {
+    backgroundColor: '#15803D',
+  },
+  currentBadge: {
+    backgroundColor: '#F59E0B',
+  },
+  badgeTxt: {
+    color: '#FFFFFF',
+    fontSize: 10,
     fontWeight: '800',
-  },
-  unlockedText: {
-    color: '#0EA5E9',
-  },
-  currentText: {
-    color: '#16A34A',
-  },
-  lockedText: {
-    color: '#94A3B8',
-  },
-  connector: {
-    width: 6,
-    height: 40,
-    marginVertical: -2,
-  },
-  connectorUnlocked: {
-    backgroundColor: '#0EA5E9',
-  },
-  connectorLocked: {
-    backgroundColor: '#E2E8F0',
   },
 });

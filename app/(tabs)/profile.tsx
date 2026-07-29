@@ -11,13 +11,13 @@ import { useAuth } from '../../context/AuthContext';
 import { Colors, Fonts, Radius, Shadow } from '../../components/KidsTheme';
 
 const avatars: Record<string, any> = {
-  tiger: require('../../assets/avatars/tiger.png'),
-  panda: require('../../assets/avatars/panda.png'),
-  elephant: require('../../assets/avatars/elephant.png'),
-  lion: require('../../assets/avatars/lion.png'),
-  koala: require('../../assets/avatars/koala.png'),
-  giraffe: require('../../assets/avatars/giraffe.png'),
-  penguin: require('../../assets/avatars/penguin.png'),
+  tiger: require('../../assets/avatars/tiger.jpg'),
+  panda: require('../../assets/avatars/panda.jpg'),
+  elephant: require('../../assets/avatars/elephant.jpg'),
+  lion: require('../../assets/avatars/lion.jpg'),
+  koala: require('../../assets/avatars/koala.jpg'),
+  giraffe: require('../../assets/avatars/giraffe.jpg'),
+  penguin: require('../../assets/avatars/penguin.jpg'),
 };
 type AvatarKey = keyof typeof avatars;
 
@@ -216,11 +216,7 @@ export default function ProfileScreen() {
 
             {/* Logout */}
             <Animated.View entering={FadeInUp.delay(450).springify()}>
-              <Pressable onPress={async () => {
-                await logout();
-                if (typeof window !== 'undefined') window.location.href = '/';
-                else router.replace('/');
-              }} style={styles.logoutBtn}>
+              <Pressable onPress={() => logout()} style={styles.logoutBtn}>
                 <Text style={styles.logoutEmoji}>🚪</Text>
                 <Text style={styles.logoutText}>Log Out</Text>
               </Pressable>

@@ -1,17 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Speech from 'expo-speech';
-import Animated, { FadeIn, FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withSpring, withRepeat, withSequence, withTiming, Easing } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withSpring, withSequence, withTiming } from 'react-native-reanimated';
 import { useAuth } from '../context/AuthContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LISTEN_GAME_POOLS, SPEECH_CODES } from '../constants/translations';
-import { Colors, Fonts, Radius, Shadow } from '../components/KidsTheme';
+import { Colors, Fonts, Radius } from '../components/KidsTheme';
 import { playAudio } from '../utils/speech';
+import LevelsListUI from '../components/practice/LevelsListUI';
+import { getListenQuestions } from '../utils/gameLevels';
 
 // Shared: game complete screen
-function GameComplete({ score, emoji, onBack }: { score: number; emoji: string; onBack: () => void }) {
+function GameComplete({ 
+  score, 
+  emoji, 
+  levelNum, 
+  onNextLevel, 
+  onBack 
+}: { 
+  score: number; 
+  emoji: string; 
+  levelNum: number; 
+  onNextLevel: () => void; 
+  onBack: () => void; 
+}) {
   const scale = useSharedValue(0.5);
   useEffect(() => { scale.value = withSpring(1, { damping: 8, stiffness: 120 }); }, []);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -22,16 +34,23 @@ function GameComplete({ score, emoji, onBack }: { score: number; emoji: string; 
       <Animated.View style={[gc.card, style]}>
         <Text style={gc.emoji}>{emoji}</Text>
         <Text style={gc.congrats}>Amazing! 🎊</Text>
-        <Text style={gc.title}>Game Complete!</Text>
+        <Text style={gc.title}>Level {levelNum} Complete!</Text>
         <View style={gc.xpBadge}>
           <Text style={gc.xpText}>⭐ +{score} XP Earned!</Text>
         </View>
         <Text style={gc.message}>{score >= 40 ? 'Perfect score! You\'re a star! 🌟' : score >= 20 ? 'Great effort, keep it up! 💪' : 'Good try! Practice makes perfect! 🎯'}</Text>
-        <Pressable style={gc.btn} onPress={onBack}>
-          <LinearGradient colors={['#22C55E', '#16A34A']} style={gc.btnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-            <Text style={gc.btnText}>🎮 Back to Games</Text>
-          </LinearGradient>
-        </Pressable>
+        <View style={{ width: '100%', gap: 10 }}>
+          <Pressable style={gc.btn} onPress={onNextLevel}>
+            <LinearGradient colors={['#22C55E', '#16A34A']} style={gc.btnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+              <Text style={gc.btnText}>Next Level ➡️</Text>
+            </LinearGradient>
+          </Pressable>
+          <Pressable style={[gc.btn, { marginTop: 4 }]} onPress={onBack}>
+            <View style={{ paddingVertical: 14, alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: Radius.pill }}>
+              <Text style={{ fontFamily: Fonts.heading, fontSize: 16, color: '#374151' }}>🗺️ All 1000 Levels</Text>
+            </View>
+          </Pressable>
+        </View>
       </Animated.View>
     </View>
   );
@@ -126,76 +145,122 @@ const opt = StyleSheet.create({
   text: { fontFamily: Fonts.body, fontSize: 18, color: Colors.textDark },
 });
 
-// MAIN SCREEN
-export default function GameListenScreen() {
-  const router = useRouter();
-  const { user, updateProgress } = useAuth();
-
+// Gameplay Component
+function GameListenPlay({ 
+  selectedLevelNum, 
+  onBack, 
+  onNextLevel 
+}: { 
+  selectedLevelNum: number; 
+  onBack: () => void; 
+  onNextLevel: () => void; 
+}) {
+  const { user, updateProgress, completeLevel } = useAuth();
   const lang = user?.learningLanguage || 'tamil';
-  const QUESTION_POOL = LISTEN_GAME_POOLS[lang] || LISTEN_GAME_POOLS['tamil'];
-  const speechCode = SPEECH_CODES[lang] || 'ta-IN';
 
-  const [questions, setQuestions] = useState<typeof QUESTION_POOL>([]);
+  const [questions, setQuestions] = useState<Array<{ target: string; options: string[]; correct: number }>>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOpt, setSelectedOpt] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [gameFinished, setGameFinished] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
 
+  const isAdvancingRef = useRef(false);
   const speakerScale = useSharedValue(1);
   const speakerStyle = useAnimatedStyle(() => ({ transform: [{ scale: speakerScale.value }] }));
 
   useEffect(() => {
-    const shuffled = [...QUESTION_POOL].sort(() => Math.random() - 0.5);
-    setQuestions(shuffled.slice(0, 5));
-  }, []);
-
-  const currentQ = questions[currentIndex];
-
-  useEffect(() => {
-    // We intentionally removed autoplay here because browsers block it!
-    // The user must tap the headphone icon manually.
-  }, [currentIndex, gameFinished, questions]);
-
-  const [showFallback, setShowFallback] = useState(false);
+    const generated = getListenQuestions(selectedLevelNum, lang);
+    setQuestions(generated);
+    setCurrentIndex(0);
+    setSelectedOpt(null);
+    setScore(0);
+    setGameFinished(false);
+  }, [selectedLevelNum, user, lang]);
 
   useEffect(() => {
-    // Reset fallback when question changes
     setShowFallback(false);
   }, [currentIndex]);
 
+  const currentQ = questions[currentIndex];
+
   const handlePlayAudio = () => {
     speakerScale.value = withSequence(withSpring(1.2, { damping: 8 }), withSpring(1));
-    playAudio(currentQ.target, lang);
+    if (currentQ) {
+      playAudio(currentQ.target, lang);
+    }
+  };
+
+  const handleFinish = async (finalScore: number) => {
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
+
+    try {
+      setGameFinished(true);
+      if (user) {
+        await updateProgress(finalScore);
+        if (selectedLevelNum) {
+          try {
+            const saved = await AsyncStorage.getItem('@game_listen_completed');
+            const prevMax = saved ? parseInt(saved, 10) : 0;
+            if (selectedLevelNum > prevMax) {
+              await AsyncStorage.setItem('@game_listen_completed', selectedLevelNum.toString());
+            }
+          } catch(e) {}
+        }
+      }
+    } finally {
+      setTimeout(() => {
+        isAdvancingRef.current = false;
+      }, 1000);
+    }
   };
 
   const handleSelect = (idx: number) => {
-    if (selectedOpt !== null) return;
+    if (selectedOpt !== null || !currentQ) return;
     setSelectedOpt(idx);
     const correct = idx === currentQ.correct;
-    if (correct) setScore(s => s + 10);
+    const finalScore = correct ? score + 10 : score;
+    if (correct) setScore(finalScore);
+
     setTimeout(() => {
       if (currentIndex < questions.length - 1) {
         setCurrentIndex(i => i + 1);
         setSelectedOpt(null);
       } else {
-        setGameFinished(true);
-        if (user) updateProgress(correct ? score + 10 : score);
+        handleFinish(finalScore);
       }
     }, 1500);
   };
 
-  if (gameFinished) return <GameComplete score={score} emoji="🎧" onBack={() => router.replace('/games')} />;
+  if (gameFinished) {
+    return (
+      <GameComplete 
+        score={score} 
+        emoji="🎧" 
+        levelNum={selectedLevelNum}
+        onNextLevel={onNextLevel}
+        onBack={onBack} 
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
       <LinearGradient colors={['#ECFEFF', '#E0F2FE', '#F0F9FF']} style={StyleSheet.absoluteFill} />
 
-      <GameHeader title="🎧 Listen & Select" score={score} progress={currentIndex} total={questions.length} onBack={() => router.replace('/games')} accentColor={Colors.sky} />
+      <GameHeader 
+        title={`🎧 Level ${selectedLevelNum}`} 
+        score={score} 
+        progress={currentIndex} 
+        total={questions.length} 
+        onBack={onBack} 
+        accentColor={Colors.sky} 
+      />
 
       <View style={styles.content}>
         {currentQ && (
           <>
-            {/* Speaker button */}
             <Animated.View entering={FadeInDown.springify()} style={styles.audioSection}>
               <Pressable onPress={handlePlayAudio}>
                 <Animated.View style={[styles.speakerBtn, speakerStyle]}>
@@ -220,7 +285,6 @@ export default function GameListenScreen() {
               )}
             </Animated.View>
 
-            {/* Options */}
             <Animated.View key={currentIndex} entering={FadeInUp.delay(200).springify()} style={styles.options}>
               {currentQ.options.map((opt: string, idx: number) => {
                 let state: 'idle' | 'correct' | 'wrong' = 'idle';
@@ -235,6 +299,43 @@ export default function GameListenScreen() {
         )}
       </View>
     </View>
+  );
+}
+
+// MAIN CONTAINER SCREEN
+export default function GameListenScreen() {
+  const { user } = useAuth();
+  const [selectedLevelNum, setSelectedLevelNum] = useState<number | null>(null);
+  const [selectedTier, setSelectedTier] = useState<string | null>(null);
+
+  if (!selectedLevelNum) {
+    let tier = selectedTier || 'Beginner';
+    if (!selectedTier && user?.level) {
+      if (user.level.includes('Pro') || user.level.includes('Advanced')) tier = 'Pro';
+      else if (user.level.includes('Intermediate')) tier = 'Intermediate';
+    }
+    return (
+      <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+        <LevelsListUI 
+          gameTitle="Listening Challenge"
+          gameIcon="🎧"
+          accentColor="#0284C7"
+          gameKey="listen"
+          onSelectLevel={(num) => { 
+            setSelectedLevelNum(num); 
+          }} 
+        />
+      </View>
+    );
+  }
+
+  return (
+    <GameListenPlay 
+      key={selectedLevelNum}
+      selectedLevelNum={selectedLevelNum} 
+      onBack={() => setSelectedLevelNum(null)}
+      onNextLevel={() => setSelectedLevelNum(prev => (prev ? prev + 1 : 2))}
+    />
   );
 }
 

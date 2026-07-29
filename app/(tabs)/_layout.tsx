@@ -1,3 +1,4 @@
+import React, { useEffect } from 'react';
 import { Tabs, Redirect } from 'expo-router';
 import { View, Text, StyleSheet, useWindowDimensions, Platform } from 'react-native';
 import Sidebar from '../../components/navigation/Sidebar';
@@ -8,11 +9,13 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-na
 function TabBarIcon({ emoji, focused, color }: { emoji: string; focused: boolean; color: string }) {
   const scale = useSharedValue(focused ? 1.15 : 1);
 
-  if (focused) {
-    scale.value = withSpring(1.2, { damping: 8 });
-  } else {
-    scale.value = withSpring(1, { damping: 8 });
-  }
+  useEffect(() => {
+    if (focused) {
+      scale.value = withSpring(1.2, { damping: 8 });
+    } else {
+      scale.value = withSpring(1, { damping: 8 });
+    }
+  }, [focused]);
 
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
@@ -39,7 +42,7 @@ export default function TabLayout() {
   const { user, isLoading } = useAuth();
 
   if (!isLoading && !user) {
-    return <Redirect href="/" />;
+    return <Redirect href="/(auth)/login" />;
   }
 
   return (

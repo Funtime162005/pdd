@@ -139,14 +139,11 @@ function GameCard({ game, index }: { game: typeof games[0]; index: number }) {
 
           <View style={styles.cardFooter}>
             <StarRow count={game.stars} />
-            <Pressable
-              style={[styles.playBtn]}
-              onPress={() => router.push(game.route as any)}
-            >
+            <View style={styles.playBtn}>
               <LinearGradient colors={game.gradient} style={styles.playBtnGrad}>
                 <Text style={styles.playBtnText}>PLAY! 🎮</Text>
               </LinearGradient>
-            </Pressable>
+            </View>
           </View>
         </View>
       </Pressable>

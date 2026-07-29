@@ -5,18 +5,19 @@ import Animated, { FadeInUp, FadeInLeft, FadeInDown, useSharedValue, useAnimated
 import { useAuth } from '../../context/AuthContext';
 import MascotAssistant from '../../components/MascotAssistant';
 import { Colors, Fonts, Radius, Shadow } from '../../components/KidsTheme';
+import { API_URL } from '../../constants/config';
+import { supabase, isSupabaseConfigured } from '../../utils/supabase';
 
-const API_URL = 'https://nri-language-learning.onrender.com/api';
 
 const avatars: Record<string, any> = {
-  tiger: require('../../assets/avatars/tiger.png'),
-  panda: require('../../assets/avatars/panda.png'),
-  monkey: require('../../assets/avatars/monkey.png'),
-  elephant: require('../../assets/avatars/elephant.png'),
-  lion: require('../../assets/avatars/lion.png'),
-  koala: require('../../assets/avatars/koala.png'),
-  giraffe: require('../../assets/avatars/giraffe.png'),
-  penguin: require('../../assets/avatars/penguin.png'),
+  tiger: require('../../assets/avatars/tiger.jpg'),
+  panda: require('../../assets/avatars/panda.jpg'),
+  monkey: require('../../assets/avatars/monkey.jpg'),
+  elephant: require('../../assets/avatars/elephant.jpg'),
+  lion: require('../../assets/avatars/lion.jpg'),
+  koala: require('../../assets/avatars/koala.jpg'),
+  giraffe: require('../../assets/avatars/giraffe.jpg'),
+  penguin: require('../../assets/avatars/penguin.jpg'),
 };
 
 type LeaderboardUser = { _id: string; name: string; avatar: string; xp: number; level: string; };
@@ -42,27 +43,72 @@ export default function LeaderboardScreen() {
   const { user } = useAuth();
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
 
-  const fetchLeaderboard = async () => {
-    try {
-      const res = await fetch(`${API_URL}/leaderboard`);
-      const data = await res.json();
-      if (data && data.error) {
-        const mock: LeaderboardUser[] = [
-          { _id: '2', name: 'Priya', avatar: 'panda', xp: 21100, level: 'Intermediate - Level 8' },
-          { _id: '3', name: 'Karthik', avatar: 'tiger', xp: 18500, level: 'Beginner - Level 12' },
-          { _id: '4', name: 'Meera', avatar: 'elephant', xp: 15200, level: 'Beginner - Level 10' },
-          { _id: '5', name: 'Rahul', avatar: 'monkey', xp: 12000, level: 'Beginner - Level 6' },
-        ];
-        if (user) mock.push({ _id: user.email || '1', name: user.name, avatar: user.avatar || 'tiger', xp: user.xp > 0 ? user.xp : 25400, level: user.level || 'Pro - Level 5' });
-        else mock.push({ _id: '1', name: 'Arjun', avatar: 'lion', xp: 25400, level: 'Pro - Level 5' });
-        setLeaderboard(mock.sort((a, b) => b.xp - a.xp));
-      } else {
-        setLeaderboard(Array.isArray(data) ? data : []);
-      }
-    } catch { }
+  const getMockLeaderboard = (): LeaderboardUser[] => {
+    if (user) {
+      return [{ _id: user.email || '1', name: user.name, avatar: user.avatar || 'tiger', xp: user.xp || 0, level: user.level || 'Beginner - Level 1' }];
+    }
+    return [];
   };
 
-  useEffect(() => { fetchLeaderboard(); const iv = setInterval(fetchLeaderboard, 10000); return () => clearInterval(iv); }, [user]);
+
+  const fetchLeaderboard = async () => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, name, avatar, xp, level')
+          .order('xp', { ascending: false })
+          .limit(50);
+
+        if (data && data.length > 0 && !error) {
+          const formatted = data.map((item: any) => ({
+            _id: item.id || Math.random().toString(),
+            name: item.name,
+            avatar: item.avatar || 'tiger',
+            xp: item.xp || 0,
+            level: item.level || 'Beginner - Level 1',
+          }));
+          setLeaderboard(formatted);
+          return;
+        }
+      } catch (e) {
+        console.warn('Supabase leaderboard fetch error:', e);
+      }
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/leaderboard`).catch(() => null);
+      const data = res ? await res.json().catch(() => null) : null;
+      if (!data || data.error || !Array.isArray(data) || data.length === 0) {
+        setLeaderboard(prev => prev.length > 0 ? prev : getMockLeaderboard());
+      } else {
+        setLeaderboard(data);
+      }
+    } catch {
+      setLeaderboard(prev => prev.length > 0 ? prev : getMockLeaderboard());
+    }
+  };
+
+  useEffect(() => {
+    fetchLeaderboard();
+
+    let channel: any = null;
+    if (isSupabaseConfigured && supabase) {
+      channel = supabase
+        .channel('public:profiles')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+          fetchLeaderboard();
+        })
+        .subscribe();
+    }
+
+    const iv = setInterval(fetchLeaderboard, 10000);
+    return () => {
+      clearInterval(iv);
+      if (channel && supabase) supabase.removeChannel(channel);
+    };
+  }, [user]);
+
 
   const getAvatar = (key: string) => avatars[key] || avatars.tiger;
   const getTier = (l: string) => l ? l.split(' - ')[0] : 'Beginner';

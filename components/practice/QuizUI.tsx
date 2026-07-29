@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import Animated, { FadeInDown, SlideInRight } from 'react-native-reanimated';
 import { generatePracticeLesson, AssessmentQuestion } from '../../utils/ai';
@@ -8,8 +8,22 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { QUIZ_POOLS } from '../../constants/translations';
 import ConfettiCannon from 'react-native-confetti-cannon';
 
-export default function QuizUI({ skill, title, tier }: { skill: string, title: string, tier?: string }) {
-  const { user, updateProgress, completeModule } = useAuth();
+export default function QuizUI({ 
+  skill, 
+  title, 
+  tier, 
+  selectedLevelNum, 
+  onBack, 
+  onNextLevel 
+}: { 
+  skill: string; 
+  title: string; 
+  tier?: string; 
+  selectedLevelNum?: number; 
+  onBack?: () => void; 
+  onNextLevel?: () => void; 
+}) {
+  const { user, updateProgress, completeModule, completeLevel } = useAuth();
   const router = useRouter();
 
   const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
@@ -22,9 +36,12 @@ export default function QuizUI({ skill, title, tier }: { skill: string, title: s
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const isAdvancingRef = useRef(false);
+
   useEffect(() => {
     const fetchLesson = async () => {
       try {
+        setIsLoading(true);
         if (!user) return;
 
         // Use explicitly requested tier or fallback to calculated tier
@@ -35,12 +52,17 @@ export default function QuizUI({ skill, title, tier }: { skill: string, title: s
           else if (user.level?.includes('Intermediate') || (user.xp || 0) >= 300) activeTier = 'Intermediate';
         }
 
+        const currentNum = selectedLevelNum || 1;
+
         if (skill === 'mini-quiz' && activeTier === 'Beginner') {
-          // Beginner: use local 50-question pool
+          // Beginner: use local question pool sliced for level
           const lang = user.learningLanguage || 'tamil';
           const pool = QUIZ_POOLS[lang] || QUIZ_POOLS['tamil'];
-          const shuffled = [...pool].sort(() => Math.random() - 0.5);
-          const mappedQuestions = shuffled.slice(0, 50).map((q, idx) => ({
+          const startIdx = ((currentNum - 1) * 5) % pool.length;
+          let sliced = pool.slice(startIdx, startIdx + 5);
+          if (sliced.length < 5) sliced = [...sliced, ...pool.slice(0, 5 - sliced.length)];
+
+          const mappedQuestions = sliced.map((q, idx) => ({
             id: idx,
             question: `What is the translation for "${q.target}"?`,
             options: q.options,
@@ -51,9 +73,7 @@ export default function QuizUI({ skill, title, tier }: { skill: string, title: s
         } else {
           // Intermediate / Pro: use AI to generate hard language-specific questions
           const lang = user.learningLanguage || 'Tamil';
-          const levelLabel = activeTier === 'Pro'
-            ? `Pro-level (native idioms, complex grammar, cultural nuances in ${lang})`
-            : `Intermediate-level (sentence structure, tenses, conversational ${lang})`;
+          const levelLabel = `Level ${currentNum} (${activeTier})`;
           const generated = await generatePracticeLesson(
             `${levelLabel} ${title.toLowerCase()}`,
             activeTier,
@@ -68,7 +88,12 @@ export default function QuizUI({ skill, title, tier }: { skill: string, title: s
       }
     };
     fetchLesson();
-  }, [skill, user]);
+  }, [skill, user, selectedLevelNum, tier]);
+
+  const handleOptionSelect = (idx: number) => {
+    if (selectedOption !== null) return; // lock selection once tapped
+    setSelectedOption(idx);
+  };
 
   const handleNext = () => {
     if (selectedOption === null) return;
@@ -83,7 +108,6 @@ export default function QuizUI({ skill, title, tier }: { skill: string, title: s
       setSelectedOption(null);
     } else {
       // Finished the quiz
-      // Let's check passing logic immediately to trigger completeModule if needed
       const finalScore = isCorrect ? score + 1 : score;
       setScore(finalScore);
       setIsFinished(true);
@@ -103,16 +127,37 @@ export default function QuizUI({ skill, title, tier }: { skill: string, title: s
     }
   };
 
-  const handleContinue = () => {
-    const percentage = (score / questions.length) * 100;
-    const isPassing = percentage >= 60;
-    
-    if (isPassing) {
-      const xpGained = score * 10;
-      updateProgress(xpGained); // XP for leaderboard only
+  const handleContinue = async () => {
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
+
+    try {
+      const currentNum = selectedLevelNum || 1;
+      const percentage = (score / questions.length) * 100;
+      const isPassing = percentage >= 60;
+      
+      if (isPassing) {
+        const xpGained = score * 10;
+        await updateProgress(xpGained);
+        if (completeLevel) {
+          await completeLevel(currentNum);
+        }
+      }
+
+      if (isPassing && onNextLevel) {
+        setIsFinished(false);
+        setCurrentIndex(0);
+        setSelectedOption(null);
+        setScore(0);
+        onNextLevel();
+      } else {
+        router.replace('/(tabs)');
+      }
+    } finally {
+      setTimeout(() => {
+        isAdvancingRef.current = false;
+      }, 1000);
     }
-    
-    router.replace('/(tabs)');
   };
 
   if (isLoading) return <ActivityIndicator size="large" color="#059669" style={{ marginTop: 100 }} />;
@@ -150,7 +195,7 @@ export default function QuizUI({ skill, title, tier }: { skill: string, title: s
             <Text style={{ fontSize: 16, color: '#4B5563', textAlign: 'center', marginVertical: 10 }}>You scored {score} out of {questions.length} ({percentage.toFixed(0)}%).</Text>
             <Text style={{ fontSize: 16, color: '#4B5563', textAlign: 'center', marginVertical: 10, fontWeight: 'bold' }}>You need 60% or higher to pass the assessment and advance.</Text>
             <Pressable style={[styles.nextButton, { backgroundColor: '#EF4444', marginTop: 20 }]} onPress={handleContinue}>
-              <Text style={styles.nextText}>Return to Dashboard</Text>
+              <Text style={styles.nextText}>Try Again 🔄</Text>
             </Pressable>
           </Animated.View>
         </View>
@@ -162,11 +207,11 @@ export default function QuizUI({ skill, title, tier }: { skill: string, title: s
         <ConfettiCannon count={100} origin={{x: -10, y: 0}} />
         <Animated.View entering={FadeInDown.springify()} style={styles.card}>
           <Text style={{ fontSize: 40 }}>🎯</Text>
-          <Text style={styles.questionText}>Lesson Complete!</Text>
+          <Text style={styles.questionText}>Level {selectedLevelNum || 1} Complete!</Text>
           <Text style={{ fontSize: 18, color: '#4B5563', marginVertical: 10 }}>You scored {score} out of {questions.length} ({percentage.toFixed(0)}%)</Text>
           <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#F59E0B', marginBottom: 30 }}>+{xpGained} XP</Text>
           <Pressable style={styles.nextButton} onPress={handleContinue}>
-            <Text style={styles.nextText}>Continue</Text>
+            <Text style={styles.nextText}>{onNextLevel ? "Next Level →" : "Continue"}</Text>
           </Pressable>
         </Animated.View>
       </View>
@@ -179,8 +224,15 @@ export default function QuizUI({ skill, title, tier }: { skill: string, title: s
   return (
     <View style={{ flex: 1 }}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/')}>
-          <Text style={{ fontSize: 24 }}>✕</Text>
+        <Pressable 
+          style={{ paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#ECFDF5', borderRadius: 12 }}
+          onPress={() => {
+            if (onBack) onBack();
+            else if (router.canGoBack()) router.back();
+            else router.replace('/(tabs)');
+          }}
+        >
+          <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#065F46' }}>← Back</Text>
         </Pressable>
         <View style={styles.progressBarBg}>
           <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
@@ -195,15 +247,30 @@ export default function QuizUI({ skill, title, tier }: { skill: string, title: s
           <Text style={styles.questionText}>{currentQ.question}</Text>
 
           <View style={styles.optionsContainer}>
-            {currentQ.options.map((opt, idx) => (
-              <Pressable
-                key={idx}
-                style={[styles.optionButton, selectedOption === idx && styles.optionSelected]}
-                onPress={() => setSelectedOption(idx)}
-              >
-                <Text style={[styles.optionText, selectedOption === idx && styles.optionTextSelected]}>{opt}</Text>
-              </Pressable>
-            ))}
+            {currentQ.options.map((opt, idx) => {
+              let btnStyle = [styles.optionButton];
+              let textStyle = [styles.optionText];
+
+              if (selectedOption !== null) {
+                if (idx === currentQ.correctOption) {
+                  btnStyle.push(styles.optionCorrect);
+                  textStyle.push(styles.textCorrect);
+                } else if (idx === selectedOption) {
+                  btnStyle.push(styles.optionWrong);
+                  textStyle.push(styles.textWrong);
+                }
+              }
+
+              return (
+                <Pressable
+                  key={idx}
+                  style={btnStyle}
+                  onPress={() => handleOptionSelect(idx)}
+                >
+                  <Text style={textStyle}>{opt}</Text>
+                </Pressable>
+              );
+            })}
           </View>
         </Animated.View>
       </ScrollView>
@@ -232,9 +299,11 @@ const styles = StyleSheet.create({
   questionText: { fontSize: 24, fontWeight: 'bold', color: '#1F2937', textAlign: 'center', marginBottom: 30 },
   optionsContainer: { width: '100%', gap: 15 },
   optionButton: { padding: 20, borderRadius: 16, borderWidth: 2, borderColor: '#E5E7EB', backgroundColor: 'white', alignItems: 'center' },
-  optionSelected: { borderColor: '#10B981', backgroundColor: '#ECFDF5' },
+  optionCorrect: { borderColor: '#10B981', backgroundColor: '#ECFDF5' },
+  textCorrect: { color: '#059669', fontWeight: 'bold' },
+  optionWrong: { borderColor: '#EF4444', backgroundColor: '#FEF2F2' },
+  textWrong: { color: '#B91C1C', fontWeight: 'bold' },
   optionText: { fontSize: 18, color: '#4B5563', fontWeight: '500' },
-  optionTextSelected: { color: '#065F46', fontWeight: 'bold' },
   footer: { position: 'absolute', bottom: 0, left: -20, right: -20, padding: 20, paddingBottom: 40, backgroundColor: 'white', borderTopWidth: 1, borderColor: '#F3F4F6' },
   nextButton: { backgroundColor: '#10B981', padding: 18, borderRadius: 16, alignItems: 'center' },
   nextButtonDisabled: { backgroundColor: '#9CA3AF' },

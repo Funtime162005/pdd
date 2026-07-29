@@ -1,23 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Image, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInUp, FadeInRight, FadeInLeft, useSharedValue, useAnimatedStyle, withSpring, withRepeat, withSequence, withTiming, Easing } from 'react-native-reanimated';
 import { useAuth } from '../../context/AuthContext';
 import { UI_TRANSLATIONS } from '../../constants/translations';
 import MascotAssistant from '../../components/MascotAssistant';
 import { Colors, Fonts, Radius, Shadow } from '../../components/KidsTheme';
+import { API_URL } from '../../constants/config';
+import { supabase, isSupabaseConfigured } from '../../utils/supabase';
 
-const API_URL = 'https://nri-language-learning.onrender.com/api';
 
 const avatars: Record<string, any> = {
-  tiger: require('../../assets/avatars/tiger.png'),
-  panda: require('../../assets/avatars/panda.png'),
-  monkey: require('../../assets/avatars/monkey.png'),
-  elephant: require('../../assets/avatars/elephant.png'),
-  lion: require('../../assets/avatars/lion.png'),
-  koala: require('../../assets/avatars/koala.png'),
-  giraffe: require('../../assets/avatars/giraffe.png'),
-  penguin: require('../../assets/avatars/penguin.png'),
+  tiger: require('../../assets/avatars/tiger.jpg'),
+  panda: require('../../assets/avatars/panda.jpg'),
+  monkey: require('../../assets/avatars/monkey.jpg'),
+  elephant: require('../../assets/avatars/elephant.jpg'),
+  lion: require('../../assets/avatars/lion.jpg'),
+  koala: require('../../assets/avatars/koala.jpg'),
+  giraffe: require('../../assets/avatars/giraffe.jpg'),
+  penguin: require('../../assets/avatars/penguin.jpg'),
 };
 
 const BUBBLE_GRADIENTS: [string, string][] = [
@@ -46,52 +47,187 @@ export default function CommunityScreen() {
   const lang = user?.learningLanguage || 'tamil';
   const t = UI_TRANSLATIONS[lang] || UI_TRANSLATIONS['tamil'];
 
-  const [stats, setStats] = useState({ totalUsers: 0, totalXP: 0 });
-  const [messages, setMessages] = useState<Message[]>([]);
+  const getMockMessages = () => {
+    return [];
+  };
+
+
+  const [stats, setStats] = useState({ totalUsers: 142, totalXP: 45200 });
+  const [messages, setMessages] = useState<Message[]>(getMockMessages);
   const [inputText, setInputText] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, () => setIsKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvt, () => setIsKeyboardVisible(false));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   const fetchData = async () => {
-    try {
-      const [statsRes, msgsRes] = await Promise.all([fetch(`${API_URL}/community`), fetch(`${API_URL}/messages`)]);
-      const statsData = await statsRes.json();
-      const msgsData = await msgsRes.json();
-      if (statsData.error) setStats({ totalUsers: 142, totalXP: 45200 }); else setStats(statsData);
-      if (msgsData.error) {
-        const mock = [
-          { _id: 'm1', text: t.communityMockMessage || 'Excited to learn here! 🎉', authorName: 'Sarah', authorAvatar: 'panda', timestamp: new Date().toISOString() },
-          { _id: 'm2', text: 'Does anyone want to practice speaking later? 🎤', authorName: 'Rahul', authorAvatar: 'lion', timestamp: new Date(Date.now() - 3600000).toISOString() },
-          { _id: 'm3', text: 'The games are SO fun! Love this app 😍', authorName: 'Emily', authorAvatar: 'giraffe', timestamp: new Date(Date.now() - 7200000).toISOString() },
-        ];
-        if (user) mock.unshift({ _id: 'm0', text: `Hi I'm ${user.name}! Just joined! 👋`, authorName: user.name, authorAvatar: user.avatar || 'tiger', timestamp: new Date().toISOString() });
-        setMessages(mock);
-      } else {
-        setMessages(Array.isArray(msgsData) ? msgsData : []);
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const [msgsRes, profilesRes] = await Promise.all([
+          supabase.from('messages').select('*').order('timestamp', { ascending: false }).limit(50),
+          supabase.from('profiles').select('xp', { count: 'exact' })
+        ]);
+
+        if (msgsRes.data && msgsRes.data.length > 0) {
+          const formattedMsgs: Message[] = msgsRes.data.map((m: any) => ({
+            _id: m.id || Math.random().toString(),
+            text: m.text,
+            authorName: m.author_name || m.authorName || 'Friend',
+            authorAvatar: m.author_avatar || m.authorAvatar || 'tiger',
+            timestamp: m.timestamp || new Date().toISOString()
+          }));
+          setMessages(formattedMsgs);
+        }
+
+        const userCount = profilesRes.count || 142;
+        const totalXP = profilesRes.data ? profilesRes.data.reduce((acc: number, cur: any) => acc + (cur.xp || 0), 0) : 45200;
+        setStats({ totalUsers: userCount, totalXP });
+        return;
+      } catch (err) {
+        console.warn('Supabase community fetchData error:', err);
       }
-    } catch { }
+    }
+
+    try {
+      const [statsRes, msgsRes] = await Promise.all([
+        fetch(`${API_URL}/community`).catch(() => null),
+        fetch(`${API_URL}/messages`).catch(() => null)
+      ]);
+      
+      const statsData = statsRes ? await statsRes.json().catch(() => ({})) : {};
+      const msgsData = msgsRes ? await msgsRes.json().catch(() => ([])) : [];
+      
+      if (!statsData || statsData.error || typeof statsData.totalUsers === 'undefined') {
+        setStats(prev => prev.totalUsers > 0 ? prev : { totalUsers: 142, totalXP: 45200 });
+      } else {
+        setStats(statsData);
+      }
+      
+      if (!msgsData || msgsData.error || !Array.isArray(msgsData) || msgsData.length === 0) {
+        setMessages(prev => prev.length > 0 ? prev : getMockMessages());
+      } else {
+        setMessages(msgsData);
+      }
+    } catch {
+      setStats(prev => prev.totalUsers > 0 ? prev : { totalUsers: 142, totalXP: 45200 });
+      setMessages(prev => prev.length > 0 ? prev : getMockMessages());
+    }
   };
 
-  useEffect(() => { fetchData(); const i = setInterval(fetchData, 10000); return () => clearInterval(i); }, [user]);
+  useEffect(() => {
+    fetchData();
+
+    let channel: any = null;
+    if (isSupabaseConfigured && supabase) {
+      channel = supabase
+        .channel('public:messages')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+          if (payload.new) {
+            const newMsg: Message = {
+              _id: payload.new.id || Math.random().toString(),
+              text: payload.new.text,
+              authorName: payload.new.author_name || 'Friend',
+              authorAvatar: payload.new.author_avatar || 'tiger',
+              timestamp: payload.new.timestamp || new Date().toISOString()
+            };
+            setMessages(prev => [newMsg, ...prev.filter(m => m._id !== newMsg._id)]);
+          }
+        })
+        .subscribe();
+    }
+
+    const i = setInterval(fetchData, 10000);
+    return () => {
+      clearInterval(i);
+      if (channel && supabase) supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  const activeUser = user || { name: 'Learner', avatar: 'tiger' };
 
   const handlePost = async () => {
-    if (!inputText.trim() || !user) return;
+    if (!inputText.trim()) return;
+    const textToSend = inputText.trim();
+    setInputText('');
     setIsPosting(true);
-    try {
-      const res = await fetch(`${API_URL}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: inputText.trim(), authorName: user.name, authorAvatar: user.avatar || 'tiger' }) });
-      const newMsg = await res.json();
-      if (newMsg && !newMsg.error) setMessages([newMsg, ...(Array.isArray(messages) ? messages : [])]);
-      else {
-        const fallback = { _id: Math.random().toString(), text: inputText.trim(), authorName: user.name, authorAvatar: user.avatar || 'tiger', timestamp: new Date().toISOString() };
-        setMessages([fallback, ...(Array.isArray(messages) ? messages : [])]);
+    
+    const senderName = activeUser.name;
+    const senderAvatar = activeUser.avatar || 'tiger';
+
+    const newLocalMsg: Message = { 
+      _id: 'msg-' + Date.now(), 
+      text: textToSend, 
+      authorName: senderName, 
+      authorAvatar: senderAvatar, 
+      timestamp: new Date().toISOString() 
+    };
+    
+    setMessages(prev => [newLocalMsg, ...prev]);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: supaMsg } = await supabase
+          .from('messages')
+          .insert([
+            {
+              text: textToSend,
+              author_name: senderName,
+              author_avatar: senderAvatar,
+            }
+          ])
+          .select()
+          .single();
+
+        if (supaMsg) {
+          const serverMsg: Message = {
+            _id: supaMsg.id,
+            text: supaMsg.text,
+            authorName: supaMsg.author_name,
+            authorAvatar: supaMsg.author_avatar,
+            timestamp: supaMsg.timestamp
+          };
+          setMessages(prev => prev.map(m => m._id === newLocalMsg._id ? serverMsg : m));
+        }
+      } catch (supaErr) {
+        console.warn('Supabase post message error:', supaErr);
       }
-      setInputText('');
-    } catch { } finally { setIsPosting(false); }
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/messages`, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ 
+          text: textToSend, 
+          authorName: senderName, 
+          authorAvatar: senderAvatar 
+        }) 
+      });
+      const serverMsg = await res.json().catch(() => null);
+      if (serverMsg && serverMsg._id) {
+        setMessages(prev => prev.map(m => m._id === newLocalMsg._id ? serverMsg : m));
+      }
+    } catch (err) {
+      console.warn('[Community] Post message error:', err);
+    } finally { 
+      setIsPosting(false); 
+    }
   };
+
 
   const getAvatar = (key: string) => avatars[key] || avatars.tiger;
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
       <LinearGradient colors={['#EFF6FF', '#FDF4FF', '#FFFDE7']} style={StyleSheet.absoluteFill} />
 
       {/* Floating emojis */}
@@ -99,7 +235,7 @@ export default function CommunityScreen() {
       <FloatingEmoji emoji="🌍" top={70} right={30} delay={300} />
       <FloatingEmoji emoji="🎉" top={120} left={80} delay={600} />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
         {/* Header */}
         <Animated.View entering={FadeInUp.springify()} style={styles.header}>
@@ -146,7 +282,7 @@ export default function CommunityScreen() {
               </View>
             ) : (
               messages.map((msg, index) => {
-                const isMe = user && user.name === msg.authorName;
+                const isMe = activeUser && activeUser.name === msg.authorName;
                 const grad = BUBBLE_GRADIENTS[index % BUBBLE_GRADIENTS.length];
                 const borderColor = BUBBLE_BORDERS[index % BUBBLE_BORDERS.length];
                 return (
@@ -175,13 +311,13 @@ export default function CommunityScreen() {
           </View>
         </Animated.View>
 
-        <View style={{ height: 120 }} />
+        <View style={{ height: 90 }} />
       </ScrollView>
 
-      {/* Input area */}
-      {user && (
+      {/* Input area - Always visible */}
+      <View style={[styles.inputAreaOuter, { paddingBottom: Platform.OS === 'web' || isKeyboardVisible ? 0 : 88 }]}>
         <View style={styles.inputArea}>
-          <Image source={getAvatar(user.avatar || 'tiger')} style={styles.inputAvatar} />
+          <Image source={getAvatar(activeUser.avatar || 'tiger')} style={styles.inputAvatar} />
           <TextInput
             style={styles.input}
             placeholder="Say something fun! 😊"
@@ -202,25 +338,23 @@ export default function CommunityScreen() {
             </LinearGradient>
           </Pressable>
         </View>
-      )}
-
-      <MascotAssistant message="Say hi to your friends! 👋" bottomOffset={100} />
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 20, paddingTop: 60, paddingBottom: 40 },
+  content: { padding: 20, paddingTop: 60, paddingBottom: 10 },
   header: { marginBottom: 20 },
   title: { fontFamily: Fonts.heading, fontSize: 34, color: Colors.textDark },
   subtitle: { fontFamily: Fonts.bodyReg, fontSize: 15, color: Colors.textMid, marginTop: 4 },
 
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  statCard: { flex: 1, alignItems: 'center', borderRadius: Radius.xl, padding: 14, borderWidth: 2.5 },
-  statEmoji: { fontSize: 26, marginBottom: 4 },
-  statNum: { fontFamily: Fonts.heading, fontSize: 18 },
-  statLabel: { fontFamily: Fonts.bodyReg, fontSize: 11, color: Colors.textMid, marginTop: 2 },
+  statsRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
+  statCard: { flex: 1, minWidth: 90, alignItems: 'center', borderRadius: Radius.xl, paddingVertical: 12, paddingHorizontal: 4, borderWidth: 2.5 },
+  statEmoji: { fontSize: 22, marginBottom: 2 },
+  statNum: { fontFamily: Fonts.heading, fontSize: 16 },
+  statLabel: { fontFamily: Fonts.bodyReg, fontSize: 11, color: Colors.textMid, marginTop: 2, textAlign: 'center' },
 
   stickersRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 22 },
   stickerBubble: {
@@ -255,16 +389,17 @@ const styles = StyleSheet.create({
   msgTime: { fontFamily: Fonts.bodyReg, fontSize: 11, color: Colors.textLight },
   msgText: { fontFamily: Fonts.bodyReg, fontSize: 14, color: Colors.textMid, lineHeight: 20 },
 
+  inputAreaOuter: {
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 2,
+    borderTopColor: Colors.greenLight,
+    ...(Platform.OS === 'web' ? { boxShadow: '0px -4px 16px rgba(34,197,94,0.1)' } : {}),
+  },
   inputArea: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 3,
-    borderTopColor: Colors.greenLight,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 14,
+    padding: 10,
     gap: 10,
-    ...(Platform.OS === 'web' ? { boxShadow: '0px -4px 16px rgba(34,197,94,0.1)' } : {}),
   },
   inputAvatar: { width: 40, height: 40, borderRadius: 20, borderWidth: 2.5, borderColor: Colors.green },
   input: {

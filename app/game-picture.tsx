@@ -1,18 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeIn, FadeInUp, FadeInDown, useSharedValue, useAnimatedStyle, withSpring, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInUp, FadeInDown, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { useAuth } from '../context/AuthContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PICTURE_GAME_POOLS } from '../constants/translations';
-import { Colors, Fonts, Radius, Shadow } from '../components/KidsTheme';
+import { Colors, Fonts, Radius } from '../components/KidsTheme';
+import LevelsListUI from '../components/practice/LevelsListUI';
+import { getPictureQuestions } from '../utils/gameLevels';
 
-const LANGUAGE_NAMES: Record<string, string> = {
-  tamil: 'Tamil', hindi: 'Hindi', telugu: 'Telugu', malayalam: 'Malayalam', kannada: 'Kannada',
-};
-
-function GameComplete({ score, onBack }: { score: number; onBack: () => void }) {
+function GameComplete({ 
+  score, 
+  levelNum, 
+  onNextLevel, 
+  onBack 
+}: { 
+  score: number; 
+  levelNum: number; 
+  onNextLevel: () => void; 
+  onBack: () => void; 
+}) {
   const scale = useSharedValue(0.5);
   useEffect(() => { scale.value = withSpring(1, { damping: 8 }); }, []);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -23,16 +30,23 @@ function GameComplete({ score, onBack }: { score: number; onBack: () => void }) 
       <Animated.View style={[gc.card, style]}>
         <Text style={gc.emoji}>🖼️</Text>
         <Text style={gc.congrats}>You nailed it! 🏆</Text>
-        <Text style={gc.title}>Picture Quiz Done!</Text>
+        <Text style={gc.title}>Level {levelNum} Complete!</Text>
         <View style={gc.xpBadge}>
           <Text style={gc.xpText}>⭐ +{score} XP Earned!</Text>
         </View>
         <Text style={gc.message}>{score >= 40 ? 'Visual master! Outstanding! 👁️' : score >= 20 ? 'Great eyes! Keep looking! 👀' : 'Keep practicing! You\'ll get it! 💪'}</Text>
-        <Pressable style={gc.btn} onPress={onBack}>
-          <LinearGradient colors={['#F59E0B', '#EA580C']} style={gc.btnGrad}>
-            <Text style={gc.btnText}>🎮 Back to Games</Text>
-          </LinearGradient>
-        </Pressable>
+        <View style={{ width: '100%', gap: 10 }}>
+          <Pressable style={gc.btn} onPress={onNextLevel}>
+            <LinearGradient colors={['#F59E0B', '#EA580C']} style={gc.btnGrad}>
+              <Text style={gc.btnText}>Next Level ➡️</Text>
+            </LinearGradient>
+          </Pressable>
+          <Pressable style={[gc.btn, { marginTop: 4 }]} onPress={onBack}>
+            <View style={{ paddingVertical: 14, alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: Radius.pill }}>
+              <Text style={{ fontFamily: Fonts.heading, fontSize: 16, color: '#374151' }}>🗺️ All 1000 Levels</Text>
+            </View>
+          </Pressable>
+        </View>
       </Animated.View>
     </View>
   );
@@ -58,12 +72,12 @@ const gc = StyleSheet.create({
   btnText: { fontFamily: Fonts.heading, fontSize: 18, color: '#FFFFFF' },
 });
 
-function GameHeader({ score, progress, total, onBack }: any) {
+function GameHeader({ score, progress, total, onBack, levelNum }: any) {
   return (
     <View style={gh.container}>
       <Pressable onPress={onBack} style={gh.backBtn}><Text style={gh.backTxt}>← Back</Text></Pressable>
       <View style={gh.center}>
-        <Text style={gh.title}>🖼️ Picture Quiz</Text>
+        <Text style={gh.title}>🖼️ Level {levelNum}</Text>
         <View style={gh.dots}>{Array.from({ length: total }).map((_, i) => <View key={i} style={[gh.dot, i < progress && gh.dotActive]} />)}</View>
       </View>
       <View style={gh.scorePill}><Text style={gh.scoreText}>⭐ {score}</Text></View>
@@ -83,82 +97,144 @@ const gh = StyleSheet.create({
   scoreText: { fontFamily: Fonts.body, fontSize: 14, color: Colors.yellowDark },
 });
 
-export default function GamePictureScreen() {
-  const router = useRouter();
-  const { user, updateProgress } = useAuth();
-
+function GamePicturePlay({ 
+  selectedLevelNum, 
+  onBack, 
+  onNextLevel 
+}: { 
+  selectedLevelNum: number; 
+  onBack: () => void; 
+  onNextLevel: () => void; 
+}) {
+  const { user, updateProgress, completeLevel } = useAuth();
   const lang = user?.learningLanguage || 'tamil';
-  const QUESTION_POOL = PICTURE_GAME_POOLS[lang] || PICTURE_GAME_POOLS['tamil'];
-  const langName = LANGUAGE_NAMES[lang] || 'Tamil';
 
-  const [questions, setQuestions] = useState<typeof QUESTION_POOL>([]);
+  const [questions, setQuestions] = useState<Array<{ emoji: string; word: string; options: string[]; correct: number }>>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOpt, setSelectedOpt] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [gameFinished, setGameFinished] = useState(false);
 
-  const emojiScale = useSharedValue(1);
-  const emojiStyle = useAnimatedStyle(() => ({ transform: [{ scale: emojiScale.value }] }));
+  const isAdvancingRef = useRef(false);
 
   useEffect(() => {
-    const shuffled = [...QUESTION_POOL].sort(() => Math.random() - 0.5);
-    setQuestions(shuffled.slice(0, 5));
-  }, []);
-
-  useEffect(() => {
-    emojiScale.value = withSequence(withTiming(0.8), withSpring(1.1, { damping: 6 }), withSpring(1));
-  }, [currentIndex]);
+    const generated = getPictureQuestions(selectedLevelNum, lang);
+    setQuestions(generated);
+    setCurrentIndex(0);
+    setSelectedOpt(null);
+    setScore(0);
+    setGameFinished(false);
+  }, [selectedLevelNum, user, lang]);
 
   const currentQ = questions[currentIndex];
 
+  const handleFinish = async (finalScore: number) => {
+    if (isAdvancingRef.current) return;
+    isAdvancingRef.current = true;
+
+    try {
+      setGameFinished(true);
+      if (user) {
+        await updateProgress(finalScore);
+        if (selectedLevelNum) {
+          try {
+            const saved = await AsyncStorage.getItem('@game_picture_completed');
+            const prevMax = saved ? parseInt(saved, 10) : 0;
+            if (selectedLevelNum > prevMax) {
+              await AsyncStorage.setItem('@game_picture_completed', selectedLevelNum.toString());
+            }
+          } catch(e) {}
+        }
+      }
+    } finally {
+      setTimeout(() => {
+        isAdvancingRef.current = false;
+      }, 1000);
+    }
+  };
+
   const handleSelect = (idx: number) => {
-    if (!currentQ || selectedOpt !== null) return;
+    if (selectedOpt !== null || !currentQ) return;
     setSelectedOpt(idx);
     const correct = idx === currentQ.correct;
-    if (correct) setScore(s => s + 10);
+    const finalScore = correct ? score + 10 : score;
+    if (correct) setScore(finalScore);
+
     setTimeout(() => {
       if (currentIndex < questions.length - 1) {
         setCurrentIndex(i => i + 1);
         setSelectedOpt(null);
       } else {
-        setGameFinished(true);
-        if (user) updateProgress(correct ? score + 10 : score);
+        handleFinish(finalScore);
       }
-    }, 1300);
+    }, 1500);
   };
 
-  if (gameFinished) return <GameComplete score={score} onBack={() => router.replace('/games')} />;
+  if (gameFinished) {
+    return (
+      <GameComplete 
+        score={score} 
+        levelNum={selectedLevelNum}
+        onNextLevel={onNextLevel}
+        onBack={onBack} 
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#FFF9F0', '#FEF3C7', '#FFFDE7']} style={StyleSheet.absoluteFill} />
-      <GameHeader score={score} progress={currentIndex} total={questions.length} onBack={() => router.replace('/games')} />
+      <LinearGradient colors={['#FFFBEB', '#FEF3C7', '#FFF7ED']} style={StyleSheet.absoluteFill} />
+
+      <GameHeader 
+        score={score} 
+        progress={currentIndex} 
+        total={questions.length} 
+        onBack={onBack} 
+        levelNum={selectedLevelNum} 
+      />
 
       <View style={styles.content}>
         {currentQ && (
           <>
-            {/* Emoji display */}
-            <Animated.View key={`emoji-${currentIndex}`} entering={FadeInDown.springify()} style={styles.emojiSection}>
-              <View style={styles.emojiFrame}>
-                <LinearGradient colors={['#FEF3C7', '#FFEDD5']} style={styles.emojiFrameGrad} />
-                <Animated.Text style={[styles.emoji, emojiStyle]}>{currentQ.emoji}</Animated.Text>
+            <Animated.View entering={FadeInDown.springify()} style={styles.picSection}>
+              <View style={styles.pictureFrame}>
+                <LinearGradient colors={['#F59E0B', '#F97316']} style={styles.picGrad}>
+                  <Text style={styles.bigEmoji}>{currentQ.emoji}</Text>
+                </LinearGradient>
               </View>
-              <Text style={styles.instruction}>What is this in <Text style={{ color: Colors.orange }}>{langName}</Text>? 🤔</Text>
+              <Text style={styles.promptText}>Which word matches this picture? 🤔</Text>
             </Animated.View>
 
-            {/* 2x2 Option grid */}
-            <Animated.View key={`opts-${currentIndex}`} entering={FadeInUp.delay(150).springify()} style={styles.optGrid}>
-              {currentQ.options.map((opt: string, idx: number) => {
-                let bg = '#FFFFFF', border = '#E5E7EB', textColor = Colors.textDark;
+            <Animated.View key={currentIndex} entering={FadeInUp.delay(200).springify()} style={styles.options}>
+              {currentQ.options.map((optText: string, idx: number) => {
+                let isSel = selectedOpt === idx;
+                let isCorr = idx === currentQ.correct;
+
+                let btnBg = '#FFFFFF';
+                let btnBorder = '#E5E7EB';
+                let textColor = Colors.textDark;
+
                 if (selectedOpt !== null) {
-                  if (idx === currentQ.correct) { bg = Colors.greenLight; border = Colors.green; textColor = Colors.greenDark; }
-                  else if (idx === selectedOpt) { bg = Colors.redLight; border = Colors.red; textColor = Colors.red; }
+                  if (isCorr) {
+                    btnBg = Colors.greenLight;
+                    btnBorder = Colors.green;
+                    textColor = Colors.greenDark;
+                  } else if (isSel) {
+                    btnBg = Colors.redLight;
+                    btnBorder = Colors.red;
+                    textColor = Colors.red;
+                  }
                 }
+
                 return (
-                  <Pressable key={idx} onPress={() => handleSelect(idx)} style={[styles.optCard, { backgroundColor: bg, borderColor: border }]}>
-                    {selectedOpt !== null && idx === currentQ.correct && <Text style={styles.optTick}>✅</Text>}
-                    {selectedOpt !== null && idx === selectedOpt && idx !== currentQ.correct && <Text style={styles.optTick}>❌</Text>}
-                    <Text style={[styles.optText, { color: textColor }]}>{opt}</Text>
+                  <Pressable
+                    key={idx}
+                    onPress={() => handleSelect(idx)}
+                    style={[styles.optBtn, { backgroundColor: btnBg, borderColor: btnBorder }]}
+                  >
+                    {selectedOpt !== null && isCorr && <Text style={{ fontSize: 20, marginRight: 6 }}>✅</Text>}
+                    {selectedOpt !== null && isSel && !isCorr && <Text style={{ fontSize: 20, marginRight: 6 }}>❌</Text>}
+                    <Text style={[styles.optText, { color: textColor }]}>{optText}</Text>
                   </Pressable>
                 );
               })}
@@ -170,32 +246,57 @@ export default function GamePictureScreen() {
   );
 }
 
+export default function GamePictureScreen() {
+  const { user } = useAuth();
+  const [selectedLevelNum, setSelectedLevelNum] = useState<number | null>(null);
+  const [selectedTier, setSelectedTier] = useState<string | null>(null);
+
+  if (!selectedLevelNum) {
+    let tier = selectedTier || 'Beginner';
+    if (!selectedTier && user?.level) {
+      if (user.level.includes('Pro') || user.level.includes('Advanced')) tier = 'Pro';
+      else if (user.level.includes('Intermediate')) tier = 'Intermediate';
+    }
+    return (
+      <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+        <LevelsListUI 
+          gameTitle="Picture Match"
+          gameIcon="🖼️"
+          accentColor="#D97706"
+          gameKey="picture"
+          onSelectLevel={(num) => { 
+            setSelectedLevelNum(num); 
+          }} 
+        />
+      </View>
+    );
+  }
+
+  return (
+    <GamePicturePlay 
+      key={selectedLevelNum}
+      selectedLevelNum={selectedLevelNum} 
+      onBack={() => setSelectedLevelNum(null)}
+      onNextLevel={() => setSelectedLevelNum(prev => (prev ? prev + 1 : 2))}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  content: { flex: 1, padding: 20, justifyContent: 'center', gap: 24 },
-  emojiSection: { alignItems: 'center' },
-  emojiFrame: {
-    width: 180, height: 180, borderRadius: 40,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 3, borderColor: Colors.yellow,
-    overflow: 'hidden',
-    marginBottom: 16,
-    ...(Platform.OS === 'web' ? { boxShadow: '0px 12px 32px rgba(250,204,21,0.3)' } : { ...Shadow.yellow }),
+  content: { flex: 1, padding: 20, justifyContent: 'center' },
+  picSection: { alignItems: 'center', marginBottom: 36 },
+  pictureFrame: {
+    borderRadius: Radius.xl,
+    padding: 6,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 20,
+    ...(Platform.OS === 'web' ? { boxShadow: '0px 16px 40px rgba(245,158,11,0.35)' } : { elevation: 12 }),
   },
-  emojiFrameGrad: { ...StyleSheet.absoluteFill },
-  emoji: { fontSize: 96 },
-  instruction: { fontFamily: Fonts.body, fontSize: 17, color: Colors.textDark, textAlign: 'center' },
-  optGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, justifyContent: 'center' },
-  optCard: {
-    width: '46%',
-    minHeight: 70,
-    borderRadius: Radius.lg,
-    borderWidth: 2.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 14,
-    ...(Platform.OS === 'web' ? { boxShadow: '0px 4px 12px rgba(0,0,0,0.07)' } : { ...Shadow.soft }),
-  },
-  optTick: { fontSize: 20, marginBottom: 4 },
-  optText: { fontFamily: Fonts.body, fontSize: 16, textAlign: 'center' },
+  picGrad: { width: 170, height: 170, borderRadius: Radius.lg, justifyContent: 'center', alignItems: 'center' },
+  bigEmoji: { fontSize: 88 },
+  promptText: { fontFamily: Fonts.bodyReg, fontSize: 17, color: Colors.textMid, textAlign: 'center' },
+  options: { gap: 12 },
+  optBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 18, borderRadius: Radius.lg, borderWidth: 2.5 },
+  optText: { fontFamily: Fonts.body, fontSize: 19 },
 });

@@ -4,10 +4,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
-import { signInWithGoogleFirebase } from '../../utils/firebase';
 import { Colors, Fonts, Radius, Shadow } from '../../components/KidsTheme';
-
-const googleIconUri = `data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24'%3E%3Cpath fill='%234285F4' d='M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z'/%3E%3Cpath fill='%2334A853' d='M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z'/%3E%3Cpath fill='%23FBBC05' d='M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z'/%3E%3Cpath fill='%23EA4335' d='M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z'/%3E%3C/svg%3E`;
 
 function FunInput({ label, icon, ...props }: any) {
   const [focused, setFocused] = useState(false);
@@ -46,12 +43,11 @@ const inputStyles = StyleSheet.create({
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { register, loginWithGoogle } = useAuth();
+  const { register } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const buttonScale = useSharedValue(1);
   const buttonStyle = useAnimatedStyle(() => ({ transform: [{ scale: buttonScale.value }] }));
 
@@ -62,30 +58,16 @@ export default function RegisterScreen() {
       await register(email, password, name);
       router.replace('/language-selection');
     } catch (err: any) {
-      alert('Registration failed: ' + err.message);
+      if (err.message.includes('auth/email-already-in-use')) {
+        alert('Registration failed: Email already in use.');
+      } else {
+        alert('Registration failed: ' + err.message);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleGooglePress = async () => {
-    setIsGoogleLoading(true);
-    try {
-      const firebaseUser = await signInWithGoogleFirebase();
-      if (firebaseUser && firebaseUser.email) {
-        const userData = await loginWithGoogle(firebaseUser.email, firebaseUser.displayName || firebaseUser.email.split('@')[0]);
-        if (userData && userData.xp > 0) {
-          router.replace('/(tabs)');
-        } else {
-          router.replace('/language-selection');
-        }
-      }
-    } catch (err: any) {
-      alert('Google Sign-up failed: ' + err.message);
-    } finally {
-      setIsGoogleLoading(false);
-    }
-  };
 
   return (
     <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
@@ -113,7 +95,7 @@ export default function RegisterScreen() {
             onPress={handleRegister}
             onPressIn={() => { buttonScale.value = withSpring(0.94, { damping: 10 }); }}
             onPressOut={() => { buttonScale.value = withSpring(1, { damping: 10 }); }}
-            disabled={isLoading || isGoogleLoading}
+            disabled={isLoading}
           >
             <LinearGradient colors={Colors.gradPurple} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.registerBtnGrad}>
               {isLoading ? <ActivityIndicator color="white" /> : <Text style={styles.registerBtnText}>Create Account ✨</Text>}
@@ -121,24 +103,10 @@ export default function RegisterScreen() {
           </Pressable>
         </Animated.View>
 
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <Pressable style={[styles.googleBtn, (isLoading || isGoogleLoading) && { opacity: 0.6 }]} onPress={handleGooglePress} disabled={isLoading || isGoogleLoading}>
-          {isGoogleLoading ? <ActivityIndicator color={Colors.textMid} /> : (
-            <>
-              <Image source={{ uri: googleIconUri }} style={{ width: 22, height: 22, marginRight: 12 }} />
-              <Text style={styles.googleBtnText}>Continue with Google</Text>
-            </>
-          )}
-        </Pressable>
-
         <Pressable style={styles.linkBtn} onPress={() => router.push('/(auth)/login')}>
           <Text style={styles.linkText}>Already a member? <Text style={styles.linkBold}>Sign in 🚀</Text></Text>
         </Pressable>
+
       </Animated.View>
     </ScrollView>
   );

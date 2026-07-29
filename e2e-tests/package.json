@@ -1,0 +1,26 @@
+{
+  "name": "e2e-tests",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "cross-env ANDROID_HOME=C:\\\\Users\\\\dines\\\\AppData\\\\Local\\\\Android\\\\Sdk wdio run wdio.conf.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@wdio/appium-service": "^9.28.0",
+    "@wdio/cli": "^9.28.0",
+    "@wdio/local-runner": "^9.28.0",
+    "@wdio/mocha-framework": "^9.28.0",
+    "@wdio/spec-reporter": "^9.28.0",
+    "appium": "^3.5.0",
+    "appium-uiautomator2-driver": "^7.6.1",
+    "chai": "^6.2.2",
+    "cross-env": "^10.1.0",
+    "exceljs": "^4.4.0",
+    "webdriverio": "^9.28.0"
+  }
+}
