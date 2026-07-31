@@ -7,10 +7,6 @@ const languageMap: Record<string, string> = {
   hindi: 'hi-IN',
   telugu: 'te-IN',
   malayalam: 'ml-IN',
-  kannada: 'kn-IN',
-  spanish: 'es-ES',
-  french: 'fr-FR',
-  german: 'de-DE',
   english: 'en-US',
 };
 
@@ -101,10 +97,6 @@ const responsiveVoiceMap: Record<string, string> = {
   hindi: 'Hindi Female',
   telugu: 'Telugu Female',
   malayalam: 'Malayalam Female',
-  kannada: 'Kannada Female',
-  spanish: 'Spanish Female',
-  french: 'French Female',
-  german: 'German Female',
   english: 'US English Female',
 };
 
