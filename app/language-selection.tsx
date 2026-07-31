@@ -11,7 +11,6 @@ const LANGUAGES = [
   { id: 'hindi',     name: 'Hindi',     native: 'हिन्दी',   emoji: '🕌', gradient: ['#38BDF8', '#0284C7'] as [string,string] },
   { id: 'telugu',    name: 'Telugu',    native: 'తెలుగు',   emoji: '🦚', gradient: ['#A855F7', '#7C3AED'] as [string,string] },
   { id: 'malayalam', name: 'Malayalam', native: 'മലയാളം',  emoji: '🌴', gradient: ['#FB923C', '#EA580C'] as [string,string] },
-  { id: 'kannada',   name: 'Kannada',   native: 'ಕನ್ನಡ',    emoji: '🐘', gradient: ['#F472B6', '#DB2777'] as [string,string] },
 ];
 
 function LanguageCard({ lang, index, onPress }: { lang: typeof LANGUAGES[0]; index: number; onPress: () => void }) {

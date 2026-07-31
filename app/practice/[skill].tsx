@@ -40,7 +40,9 @@ export default function PracticeScreen() {
   const handleNextLevel = async () => {
     if (selectedLevelNum) {
       const finishedNum = selectedLevelNum;
-      const key = `@game_${skill || 'general'}_${selectedTier || 'Beginner'}_completed`;
+      const lang = (user?.learningLanguage || 'tamil').toLowerCase();
+      const userKey = user?.email ? user.email.toLowerCase().replace(/[^a-z0-9]/g, '_') : (user?.id || 'guest');
+      const key = `@game_${userKey}_${lang}_${skill || 'general'}_${selectedTier || 'Beginner'}_completed`;
       const saved = await AsyncStorage.getItem(key);
       const prevMax = saved ? parseInt(saved, 10) : 0;
       if (finishedNum > prevMax) {

@@ -214,7 +214,9 @@ export default function WritingCanvasUI({ title, tier = 'Beginner', selectedLeve
       }
 
       if (!tryAgain) {
-        const storageKey = `@game_writing_${tier}_completed`;
+        const lang = (user?.learningLanguage || 'tamil').toLowerCase();
+        const userKey = user?.email ? user.email.toLowerCase().replace(/[^a-z0-9]/g, '_') : (user?.id || 'guest');
+        const storageKey = `@game_${userKey}_${lang}_writing_${tier}_completed`;
         const savedVal = await AsyncStorage.getItem(storageKey);
         const prevMax = savedVal ? parseInt(savedVal, 10) : 0;
         if (currentNum > prevMax) {

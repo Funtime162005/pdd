@@ -9,7 +9,7 @@ import Animated, {
   withSpring, ZoomIn
 } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CultureStory, getCultureStory, STORY_CATEGORIES } from '../../utils/stories';
+import { CultureStory, getStoriesForLanguage, STORY_CATEGORIES } from '../../utils/stories';
 import { playAudio } from '../../utils/speech';
 
 const THEME_COLORS: Record<string, [string, string]> = {
@@ -17,7 +17,6 @@ const THEME_COLORS: Record<string, [string, string]> = {
   hindi:     ['#E91E8C', '#9C27B0'],
   telugu:    ['#0EA5E9', '#6366F1'],
   malayalam: ['#10B981', '#059669'],
-  kannada:   ['#8B5CF6', '#6D28D9'],
 };
 
 const CARD_GRADIENTS: [string, string][] = [
@@ -30,6 +29,7 @@ const CARD_GRADIENTS: [string, string][] = [
   ['#EF4444', '#DC2626'],
   ['#0EA5E9', '#0284C7'],
 ];
+
 
 // ── Tamil voice helpers (module-level — stable, never recreated) ──────────────
 function getTamilVoice(): SpeechSynthesisVoice | null {
@@ -220,12 +220,9 @@ function StoryModal({ story, colors, onClose, onComplete }: {
           </LinearGradient>
 
           <View style={styles.modalActions}>
-            <Pressable style={styles.langToggleBtn} onPress={() => setShowNative(p => !p)}>
-              <Text style={styles.langToggleTxt}>{showNative ? '🌐 English' : '🌺 Native'}</Text>
-            </Pressable>
             <Pressable
-              style={[styles.audioBtn, speaking && styles.audioBtnActive]}
-              onPress={() => speaking ? stop() : readAll(story.paragraphs, showNative)}
+              style={[styles.audioBtn, speaking && styles.audioBtnActive, { flex: 1 }]}
+              onPress={() => speaking ? stop() : readAll(story.paragraphs, true)}
             >
               <Text style={styles.audioBtnTxt}>{speaking ? '⏹ Stop' : '🔊 Listen Full Story'}</Text>
             </Pressable>
@@ -319,7 +316,7 @@ export default function StoriesSection({
   onAddXp?: (xp: number) => void;
 }) {
   const colors = THEME_COLORS[language] || THEME_COLORS.tamil;
-  const [selectedCat, setSelectedCat] = useState('All 500 Stories');
+  const [selectedCat, setSelectedCat] = useState('All 20 Stories');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeStory, setActiveStory] = useState<CultureStory | null>(null);
   const [readStories, setReadStories] = useState<Record<number, boolean>>({});
@@ -332,13 +329,13 @@ export default function StoriesSection({
   }, []);
 
   const allStories = React.useMemo(
-    () => Array.from({ length: 500 }, (_, i) => getCultureStory(i + 1, language)),
+    () => getStoriesForLanguage(language),
     [language]
   );
 
   const filteredStories = React.useMemo(
     () => allStories.filter(s => {
-      const matchCat = selectedCat === 'All 500 Stories' || s.category === selectedCat;
+      const matchCat = selectedCat === 'All 20 Stories' || selectedCat === 'All 500 Stories' || s.category === selectedCat;
       const q = searchQuery.toLowerCase().trim();
       const matchSearch = !q
         || s.title.toLowerCase().includes(q)
@@ -358,8 +355,9 @@ export default function StoriesSection({
     setActiveStory(null);
   };
 
-  const readCount = Object.keys(readStories).length;
-  const pct = Math.round((readCount / 500) * 100);
+  const totalCount = allStories.length;
+  const readCount = Object.keys(readStories).filter(id => Number(id) <= totalCount).length;
+  const pct = Math.round((readCount / totalCount) * 100);
 
   return (
     <View style={styles.container}>
@@ -373,13 +371,13 @@ export default function StoriesSection({
         <View style={styles.heroDeco1} />
         <View style={styles.heroDeco2} />
         <Text style={styles.heroLabel}>📚 CULTURE WORLD</Text>
-        <Text style={styles.heroTitle}>500 Stories</Text>
+        <Text style={styles.heroTitle}>{totalCount} Stories</Text>
         <Text style={styles.heroSub}>Heritage · Folklore · Fables · Morals</Text>
         <View style={styles.heroProgressRow}>
           <View style={styles.heroProgressBg}>
             <View style={[styles.heroProgressFill, { width: `${pct}%` as any }]} />
           </View>
-          <Text style={styles.heroProgressTxt}>{readCount}/500 Read</Text>
+          <Text style={styles.heroProgressTxt}>{readCount}/{totalCount} Read</Text>
         </View>
       </LinearGradient>
 

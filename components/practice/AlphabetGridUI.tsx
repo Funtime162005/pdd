@@ -81,7 +81,8 @@ export default function AlphabetGridUI({
       setTransitioning(true);
 
       await updateProgress(20);
-      const storageKey = `@game_${skill || 'foundations'}_Beginner_completed`;
+      const userKey = user?.email ? user.email.toLowerCase().replace(/[^a-z0-9]/g, '_') : (user?.id || 'guest');
+      const storageKey = `@game_${userKey}_${lang.toLowerCase()}_${skill || 'foundations'}_Beginner_completed`;
       const savedVal = await AsyncStorage.getItem(storageKey);
       const prevMax = savedVal ? parseInt(savedVal, 10) : 0;
       if (currentNum > prevMax) {

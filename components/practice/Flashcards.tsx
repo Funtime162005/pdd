@@ -194,12 +194,7 @@ export default function Flashcards({
         <Animated.View style={[styles.card, styles.cardBack, backAnimatedStyle]}>
           <Text style={styles.cardHint}>🔊 Pronunciation Loaded</Text>
           {currentCard.emoji ? <Text style={{ fontSize: 80, marginBottom: 20 }}>{currentCard.emoji}</Text> : null}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Text style={styles.nativeText}>{currentCard.term}</Text>
-            <Pressable onPress={handleAudioPress} style={{ padding: 12, backgroundColor: '#E0F2FE', borderRadius: 24 }}>
-              <Text style={{ fontSize: 28 }}>🎧</Text>
-            </Pressable>
-          </View>
+          <Text style={styles.nativeText}>{currentCard.term}</Text>
         </Animated.View>
       </Pressable>
 

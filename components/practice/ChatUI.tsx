@@ -138,25 +138,33 @@ export default function ChatUI({ skill = 'communication', title, tier }: { skill
   const [leveledUp, setLeveledUp] = useState(false);
   const [newTier, setNewTier] = useState('');
 
-  const chatKey = `@chat_${user?.id || 'guest'}_${lang}_${skill}`;
+  const userKey = user?.email ? user.email.toLowerCase().replace(/[^a-z0-9]/g, '_') : (user?.id || 'guest');
+  const chatKey = `@chat_${userKey}_${lang}_${skill}`;
 
-  // Load Groq key and chat history
+  // Load Groq key and user-specific chat history
   useEffect(() => {
     (async () => {
       try {
-        const [storedKey, storedChat] = await Promise.all([
-          AsyncStorage.getItem(GROQ_KEY_STORAGE),
-          AsyncStorage.getItem(chatKey),
-        ]);
+        const storedKey = await AsyncStorage.getItem(GROQ_KEY_STORAGE);
         if (storedKey) setGroqKey(storedKey);
+
+        const storedChat = await AsyncStorage.getItem(chatKey);
         if (storedChat) {
           setMessages(JSON.parse(storedChat));
           setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 100);
+        } else {
+          setMessages([
+            { id: '1', text: `Hey ${user?.name || 'boss'}! 👋 Ready to drop some ${user?.learningLanguage || 'Tamil'} knowledge? Let's go! 🚀`, sender: 'tutor' },
+          ]);
         }
-      } catch { }
+      } catch {
+        setMessages([
+          { id: '1', text: `Hey ${user?.name || 'boss'}! 👋 Ready to drop some ${user?.learningLanguage || 'Tamil'} knowledge? Let's go! 🚀`, sender: 'tutor' },
+        ]);
+      }
       setKeyLoaded(true);
     })();
-  }, []);
+  }, [chatKey, user?.name, user?.learningLanguage]);
 
   const handleSend = async () => {
     if (!inputText.trim() || !groqKey) return;

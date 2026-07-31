@@ -19,6 +19,8 @@ const fetchWithTimeout = async (url: string, options: any, timeoutMs = 2000) => 
   }
 };
 
+const makeUserId = (email: string) => `user_${email.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+
 type UserData = {
   id: string;
   name: string;
@@ -117,13 +119,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             });
             const data = await res.json();
             if (data && data.error) {
-              setUser({ id: 'local1', email, name: email.split('@')[0], avatar: 'tiger', xp: savedXp, streak: 5, level: savedLevel, levelProgress: 60, learningLanguage: lang, completedModules: savedCompleted });
+              setUser({ id: makeUserId(email), email, name: email.split('@')[0], avatar: 'tiger', xp: savedXp, streak: 5, level: savedLevel, levelProgress: 60, learningLanguage: lang, completedModules: savedCompleted });
             } else {
               setUser({ ...data, learningLanguage: data.learningLanguage || lang, completedModules: data.completedModules || [] });
             }
           } catch (e) {
             console.warn('MongoDB load error (falling back to offline mode):', e);
-            setUser({ id: 'local1', email, name: email.split('@')[0], avatar: 'tiger', xp: savedXp, streak: 5, level: savedLevel, levelProgress: 60, learningLanguage: lang, completedModules: savedCompleted });
+            setUser({ id: makeUserId(email), email, name: email.split('@')[0], avatar: 'tiger', xp: savedXp, streak: 5, level: savedLevel, levelProgress: 60, learningLanguage: lang, completedModules: savedCompleted });
           }
       } catch (err) {
         console.warn('Fatal error in loadUser:', err);
@@ -153,8 +155,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }
 
+    await AsyncStorage.setItem('userEmail', email);
+
+    // Supabase is the live source of truth for profiles now (MongoDB/Render
+    // backend has been retired) — check it before falling back to anything else.
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: supaProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (supaProfile) {
+          const lang = await AsyncStorage.getItem('learningLanguage') || supaProfile.learning_language || 'tamil';
+          const userFromSupa: UserData = {
+            id: supaProfile.id,
+            email: supaProfile.email,
+            name: supaProfile.name,
+            avatar: supaProfile.avatar || 'tiger',
+            xp: supaProfile.xp || 0,
+            streak: supaProfile.streak || 1,
+            level: supaProfile.level || 'Beginner - Level 1',
+            levelProgress: supaProfile.level_progress || 0,
+            learningLanguage: lang,
+            completedModules: supaProfile.completed_modules || []
+          };
+          setUser(userFromSupa);
+          await AsyncStorage.setItem('localLevel', userFromSupa.level);
+          await AsyncStorage.setItem('localXp', userFromSupa.xp.toString());
+          await AsyncStorage.setItem('localCompletedModules', JSON.stringify(userFromSupa.completedModules));
+          setIsLoading(false);
+          return userFromSupa;
+        }
+      } catch (supaErr) {
+        console.warn('Supabase login error (falling back to offline mode):', supaErr);
+      }
+    }
+
     try {
-      await AsyncStorage.setItem('userEmail', email);
       const res = await fetchWithTimeout(`${API_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -162,11 +201,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       const data = await res.json();
       const lang = await AsyncStorage.getItem('learningLanguage') || 'tamil';
-      
+
       const localXpStr = await AsyncStorage.getItem('localXp');
       const localLevel = await AsyncStorage.getItem('localLevel');
       const localCompletedStr = await AsyncStorage.getItem('localCompletedModules');
-      
+
       const savedXp = localXpStr ? parseInt(localXpStr, 10) : 0;
       const savedLevel = localLevel || 'Beginner - Level 1';
       let savedCompleted = [];
@@ -303,7 +342,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const nextLevelNum = Math.max(currentMaxNum, levelNum + 1);
     const newLevelStr = `${currentTier} - Level ${nextLevelNum}`;
 
+    const langKey = (user.learningLanguage || 'tamil').toLowerCase();
     setUser(prev => prev ? { ...prev, level: newLevelStr } : prev);
+    await AsyncStorage.setItem(`localLevel_${langKey}`, newLevelStr);
     await AsyncStorage.setItem('localLevel', newLevelStr);
 
     if (isSupabaseConfigured && supabase) {
@@ -399,13 +440,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const data = await res.json();
       
       const lang = await AsyncStorage.getItem('learningLanguage') || 'tamil';
-      const fullUser = { ...(data.error ? { id: 'local1', email, name: name || email.split('@')[0], avatar: 'tiger', xp: 0, streak: 0, level: 'Beginner', levelProgress: 0, completedModules: [] } : data), learningLanguage: lang };
+      const fullUser = { ...(data.error ? { id: makeUserId(email), email, name: name || email.split('@')[0], avatar: 'tiger', xp: 0, streak: 0, level: 'Beginner', levelProgress: 0, completedModules: [] } : data), learningLanguage: lang };
       setUser(fullUser);
       setIsLoading(false);
       return fullUser;
     } catch (e: any) {
       const lang = await AsyncStorage.getItem('learningLanguage') || 'tamil';
-      const fullUser = { id: 'local1', email, name: name || email.split('@')[0], avatar: 'tiger', xp: 0, streak: 0, level: 'Beginner', levelProgress: 0, completedModules: [], learningLanguage: lang };
+      const fullUser = { id: makeUserId(email), email, name: name || email.split('@')[0], avatar: 'tiger', xp: 0, streak: 0, level: 'Beginner', levelProgress: 0, completedModules: [], learningLanguage: lang };
       setUser(fullUser);
       setIsLoading(false);
       return fullUser;
@@ -533,9 +574,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const setLearningLanguage = async (langId: string) => {
+    const cleanLang = langId.toLowerCase();
     await AsyncStorage.setItem('learningLanguage', langId);
+    const langLevel = await AsyncStorage.getItem(`localLevel_${cleanLang}`) || 'Beginner - Level 1';
     if (user) {
-      setUser({ ...user, learningLanguage: langId });
+      setUser({ ...user, learningLanguage: langId, level: langLevel });
 
       if (isSupabaseConfigured && supabase) {
         try {

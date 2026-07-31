@@ -127,7 +127,7 @@ export default function ProfileScreen() {
               
               <Text style={styles.editLabel}>Target Language 🌍</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-                {['tamil', 'hindi', 'telugu', 'malayalam', 'kannada', 'spanish', 'french', 'german'].map(l => (
+                {['tamil', 'hindi', 'telugu', 'malayalam'].map(l => (
                   <Pressable key={l} onPress={() => setEditLanguage(l)} style={{ backgroundColor: editLanguage === l ? Colors.purple : 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 2, borderColor: editLanguage === l ? '#FFF' : 'rgba(255,255,255,0.3)' }}>
                     <Text style={{ fontFamily: Fonts.bodySemi, color: '#FFF', textTransform: 'capitalize' }}>{l}</Text>
                   </Pressable>

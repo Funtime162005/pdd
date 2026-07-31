@@ -16,7 +16,6 @@ const LANGUAGE_NAMES: Record<string, string> = {
   hindi: 'North India 🕌',
   telugu: 'Andhra Pradesh 🌾',
   malayalam: 'Kerala 🌴',
-  kannada: 'Karnataka 🏛️',
 };
 
 function FloatingShape({ color, top, left, right, size = 60, delay = 0 }: any) {
@@ -46,15 +45,15 @@ export default function CultureScreen() {
         {/* Header */}
         <Animated.View entering={FadeInUp.springify()}>
           <Text style={styles.pageTitle}>🏛️ Culture World!</Text>
-          <Text style={styles.pageSubtitle}>Explore 500 rich traditional stories of {regionName}</Text>
+          <Text style={styles.pageSubtitle}>Explore 20 rich traditional stories of {regionName}</Text>
         </Animated.View>
 
-        {/* 500 Stories Section */}
+        {/* Stories Section */}
         <StoriesSection language={lang} />
 
         <View style={{ height: 120 }} />
       </ScrollView>
-      <MascotAssistant message="Explore 500 rich traditional stories & earn XP! 📚✨" />
+      <MascotAssistant message="Explore 20 rich traditional stories & earn XP! 📚✨" />
     </View>
   );
 }

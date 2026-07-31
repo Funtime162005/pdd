@@ -1,3 +1,7 @@
+import { HINDI_STORIES } from './storyTranslations/hindi';
+import { TELUGU_STORIES } from './storyTranslations/telugu';
+import { MALAYALAM_STORIES } from './storyTranslations/malayalam';
+
 export type CultureStory = {
   id: number;
   title: string;
@@ -10,7 +14,7 @@ export type CultureStory = {
 };
 
 export const STORY_CATEGORIES = [
-  'All 500 Stories',
+  'All 20 Stories',
   'Panchatantra & Animals 🦊',
   'Festivals & Traditions 🪔',
   'Kings & Scholars 🏰',
@@ -195,7 +199,7 @@ const BASE_STORIES: Omit<CultureStory, 'id'>[] = [
     paragraphs: [
       { native: 'ஆந்திரப் பிரதேசத்தின் பச்சை மலைகளில் ஒரு அடர்ந்த காடு இருந்தது. அந்த காட்டில் நூற்றுக்கணக்கான பறவைகள் வாழ்ந்தன. ஆனால் அனைத்திலும் மிகவும் அழகான பறவை ஒரு மயில். அதன் பெயர் ஸ்ரீகாந்த். ஸ்ரீகாந்தின் தோகை நீல நிறமும் பசுமை நிறமும் கலந்த ஒரு அற்புதமான வண்ணத்தில் இருந்தது. அது நடனமாடும்போது அந்தத் தோகை சூரிய ஒளியில் வைரம் போல் மின்னும்.', english: 'In the green mountains of Andhra Pradesh there was a dense forest. In that forest hundreds of birds lived. But the most beautiful bird of all was a peacock. Its name was Srikant. Srikant\'s plumage was in a wonderful combination of blue and green colours. When it danced, the plumage shimmered like diamonds in the sunlight.' },
       { native: 'ஸ்ரீகாந்த் மழை வரும்போது நடனமாடும். மேகங்கள் கருக்கும்போது, அது தோகை விரிக்கும். கால்கள் தாளமிடும். தலை அசையும். இந்த நடனத்தை பார்க்க காட்டிலுள்ள அனைத்து விலங்குகளும் வருவார்கள். மான்கள் அமர்ந்து பார்க்கும். குரங்குகள் மரக்கிளையில் தொங்கி பார்க்கும். ஆமைகள் மெதுவாக வந்து ஒரு கல்லின் மேல் ஏறி நின்று பார்க்கும். எல்லோருக்கும் ஸ்ரீகாந்தின் நடனம் மிகவும் பிடித்திருந்தது.', english: 'Srikant would dance when the rains came. When clouds darkened the sky, it would spread its plumage wide. Its feet would beat a rhythm. Its head would sway gracefully. To watch this dance, all the animals of the forest would come. Deer would sit and watch. Monkeys would hang from tree branches and watch. Tortoises would slowly come and climb on a rock to watch. Everyone loved Srikant\'s dance very much.' },
-      { native: 'ஆனால் ஒரு நாள் ஒரு கழுகு வந்தது. அது ஸ்ரீகாந்தை பார்த்தது. "இந்த மயில் நடனமாடுவது மட்டுமே செய்யும். பறக்கவே தெரியாது. அது என்ன பெரிய விஷயம்?" என்று கேலி செய்தது. ஸ்ரீகாந்த் தலை குனிந்தது. "உண்மைதான். என்னால் நன்றாக பறக்க முடியாது," என்று சொன்னது. கழுகு கோரஸ்வரத்தில் சிரித்தது. "நீ ஒரு வெக்கக்கேட்டவன்!" என்று கேலி செய்தது.', english: 'But one day an eagle came. It looked at Srikant with contempt. "This peacock only knows how to dance. It doesn\'t even know how to fly properly. What is so great about that?" it said mockingly. Srikant bowed its head. "That is true. I cannot fly well," it said. The eagle laughed loudly. "You are a shameful creature!" it mocked.' },
+      { native: 'ஆனால் ஒரு நாள் ஒரு கழுகு வந்தது. அது ஸ்ரீகாந்தை பார்த்தது. "இந்த மயில் நடனமாடுவது மட்டுமே செய்யும். பறக்கவே தெரியாது. அது என்ன பெரிய விஷயம்?" என்று கேலி செய்தது. ஸ்ரீகாந்த் தலை குனிந்தது. "உண்மைதான். என்னால் நன்றாக பறக்க முடியாது," என்று சொன்', english: 'But one day an eagle came. It looked at Srikant with contempt. "This peacock only knows how to dance. It doesn\'t even know how to fly properly. What is so great about that?" it said mockingly. Srikant bowed its head. "That is true. I cannot fly well," it said. The eagle laughed loudly. "You are a shameful creature!" it mocked.' },
       { native: 'ஸ்ரீகாந்த் மனம் கஷ்டப்பட்டது. அது நடனமாடவே மறந்தது. மழை வந்தாலும் தோகை விரிக்கவில்லை. காட்டின் விலங்குகள் வந்து பார்த்தன. "ஸ்ரீகாந்த், ஏன் நடனமாடவில்லை?" என்று கேட்டன. அது மௌனமாக இருந்தது. காடே மௌனமானது. மழை பொழிந்தது. ஆனால் மயிலின் நடனம் இல்லாமல் காடு குறைவாக இருந்தது.', english: 'Srikant\'s heart was troubled. It forgot to dance altogether. Even when rain came, it did not spread its plumage. The animals of the forest came and looked. "Srikant, why are you not dancing?" they asked. It remained silent. The entire forest became silent. Rain fell. But without the peacock\'s dance, the forest felt incomplete.' },
       { native: 'ஒரு வயதான ஆமை ஸ்ரீகாந்திடம் வந்தது. "மகனே, கழுகு உன்னை பறக்க தெரியாது என்று கேலி செய்தது. ஆனால் கழுகால் உன்னைப் போல் நடனமாட முடியுமா? ஒவ்வொருவருக்கும் ஒரு தனி திறமை இருக்கிறது. அந்த திறமையே நம் அடையாளம். கழுகு வானில் பறக்கும். நீ பூமியில் நடனமாடுவாய். இரண்டும் அற்புதமானவை," என்று சொன்னது.', english: 'An old tortoise came to Srikant. "My son, the eagle mocked you saying you cannot fly. But can the eagle dance like you? Each one of us has a unique talent. That talent is our identity. The eagle soars in the sky. You dance on the earth. Both are wonderful and beautiful," it said.' },
       { native: 'ஸ்ரீகாந்த் நிமிர்ந்தது. மழை வானத்தில் இருண்டு கொண்டிருந்தது. அது மெதுவாக தோகையை விரித்தது. காற்று வீசியது. அது நடனமாட ஆரம்பித்தது. ஒவ்வொரு அடியிலும் ஒரு தாளம். ஒவ்வொரு திருப்பலிலும் ஒரு வண்ணம். காட்டிலுள்ள அனைத்து விலங்குகளும் கூடிவந்தன. கழுகும் வந்தது. அது ஸ்ரீகாந்தின் நடனத்தை பார்த்தது. அதன் கண்களில் ஆச்சரியமும் மரியாதையும் தெரிந்தன.', english: 'Srikant stood tall and proud. Dark clouds were gathering in the sky. It slowly spread its plumage wide. The wind began to blow. It started to dance. In every step a rhythm. In every turn a new colour. All the animals of the forest gathered to watch. The eagle came too. It watched Srikant\'s dance. In its eyes there were both amazement and deep respect.' },
@@ -319,26 +323,126 @@ const BASE_STORIES: Omit<CultureStory, 'id'>[] = [
     moral: 'Human bonds of love and kindness are more valuable than any piece of land or property.',
     moralNative: 'அன்பு மற்றும் கருணையின் மனித உறவு எந்த நிலத்தையும் சொத்தையும் விட மதிப்பானது.',
   },
+  // 16
+  {
+    title: 'Thiruvalluvar and the Needle',
+    titleNative: 'திருவள்ளுவரும் ஊசியும்',
+    category: 'Kings & Scholars 🏰',
+    emoji: '📜',
+    paragraphs: [
+      { native: 'தமிழ்நாட்டின் மயிலாப்பூரில் திருவள்ளுவர் என்ற மகா புலவர் வாழ்ந்தார். அவர் திருக்குறளை எழுதினார். அவர் ஒரு நெசவாளி. தினமும் துணி நெய்து வாழ்ந்தார். அவரிடம் வாசுக்கி என்ற ஒரு அமைதியான மனைவி இருந்தார்.', english: 'In Mylapore of Tamil Nadu lived a great poet named Thiruvalluvar. He wrote the Thirukkural. He was a weaver. He wove cloth every day to live. He had a gentle wife named Vasuki.' },
+      { native: 'திருவள்ளுவர் உணவருந்த உட்காரும்போது எப்போதும் பக்கத்தில் ஒரு சிறிய கிண்ணத்தில் தண்ணீரும் ஒரு ஊசியும் வைப்பார். வாசுக்கி தினமும் அதை வைத்தார். ஆனால் திருவள்ளுவர் ஒருநாளும் அதை பயன்படுத்தியதில்லை. பல ஆண்டுகள் இது தொடர்ந்தது.', english: 'When Thiruvalluvar sat to eat, he always kept a small bowl of water and a needle beside him. Vasuki placed it every day. But Thiruvalluvar never used it even once. This continued for many years.' },
+      { native: 'ஒரு நாள் வாசுக்கி கேட்டார்: "ஐயா, பல ஆண்டுகளாக உணவின் போது தண்ணீரும் ஊசியும் வைக்கிறீர்கள். ஏன் என்று நான் கேட்கவில்லை. இன்று கூறுங்கள்." திருவள்ளுவர் புன்னகைத்தார்.', english: 'One day Vasuki asked: "Sir, for many years during meals you keep water and needle. I never asked why. Tell me today." Thiruvalluvar smiled.' },
+      { native: 'திருவள்ளுவர் சொன்னார்: "நீ உணவு பரிமாறும்போது ஒரு பருக்கை சாதம் கீழே விழுந்தால், அதை ஊசியால் குத்தி எடுத்து தண்ணீரில் கழுவி உண்ணவே வைத்துள்ளேன். ஆனால் நீ ஒரு நாளும் ஒரு பருக்கையைக் கூட கீழே சிந்தியதில்லை!" வாசுக்கியின் கண்களில் நீர் வந்தது.', english: 'Thiruvalluvar said: "If a grain of rice falls down while you serve, I kept them to pick it with the needle, wash in water, and eat. But not even once have you spilled a single grain!" Tears came to Vasuki\'s eyes.' },
+      { native: 'திருவள்ளுவர் உணவு வீணாவதை விரும்பவில்லை. மனைவியின் கடமையையும் பாராட்டினார். தமிழ்நாட்டில் திருக்குறள் இன்றும் நமது வாழ்க்கைக்கு வழிகாட்டுகிறது. உணவை மதிப்பதும் மனைவியை மதிப்பதும் நமது பண்பாடு.', english: 'Thiruvalluvar did not want food to be wasted. He also appreciated his wife\'s devotion. In Tamil Nadu, Thirukkural guides our life to this day. Respecting food and spouse is our culture.' },
+    ],
+    moral: 'Respect every grain of food and value the care of those who serve you with devotion.',
+    moralNative: 'உணவின் ஒவ்வொரு பருக்கையையும் மதியுங்கள், அன்புடன் பணிபுரிவோரின் அக்கறையைப் போற்றுங்கள்.',
+  },
+
+  // 17
+  {
+    title: 'Kannagi and the Anklet',
+    titleNative: 'கண்ணகியும் சிலம்பும்',
+    category: 'Mythology & Legends 🔱',
+    emoji: '👑',
+    paragraphs: [
+      { native: 'பண்டைய மதுரை நகரில் பாண்டிய மன்னன் நெடுஞ்செழியன் ஆட்சி செய்தார். அப்போழுது கோவலன் மற்றும் கண்ணகி மதுரைக்கு வந்தனர். கோவலன் கண்ணகியின் மாணிக்கச் சிலம்பை விற்க கடைத்தெருவுக்குச் சென்றான்.', english: 'In ancient Madurai city, Pandyan King Neduncheziyan ruled. Kovalan and Kannagi came to Madurai. Kovalan went to the market street to sell Kannagi\'s ruby-filled anklet.' },
+      { native: 'அரசியின் முத்துச் சிலம்பு காணாமல் போயிருந்தது. பொற்கொல்லன் கோவலனைப் பழிசுமத்தினான். மன்னன் ஆராயாமல் கோவலனுக்கு மரண தண்டனை விதித்தான். கோவலன் கொல்லப்பட்டான்.', english: 'The queen\'s pearl anklet had gone missing. The goldsmith blamed Kovalan. The king, without investigating, ordered death penalty for Kovalan. Kovalan was executed.' },
+      { native: 'செய்தி கேட்ட கண்ணகி கொதித்தெழுந்தாள். மன்னனின் கொலுமண்டபத்திற்குச் சென்றாள். தனது மற்றொரு சிலம்பை உடைத்தாள். அதிலிருந்து மாணிக்கக் கற்கள் சிதறின! அரசியின் சிலம்பில் முத்துக்கள் இருந்தன.', english: 'Hearing the news Kannagi burned with rage. She went to the king\'s royal court. She broke her other anklet. From it scattered ruby gems! The queen\'s anklet had pearls.' },
+      { native: 'மன்னன் தான் தவறான தீர்ப்பு அளித்ததை உணர்ந்தான். "யானோ அரசன், யானே கள்வன்" என்று கூறி அரியணையிலிருந்து விழுந்து உயிர்துறந்தான். நீதியின் வலிமையைக் கண்ட மதுரை திகைத்தது.', english: 'The king realized he gave a wrong judgment. Saying "Am I a king? I am the thief!" he fell from his throne and passed away. Madurai gasped seeing the power of justice.' },
+      { native: 'சிலப்பதிகாரம் என்ற தமிழ் காப்பியம் கண்ணகியின் கற்பையும் நீதியையும் போற்றுகிறது. தர்மம் எப்போது வெல்லும் என்பதை இக்கதை உணர்த்துகிறது.', english: 'The Tamil epic Silappathikaram praises Kannagi\'s purity and justice. This story reminds us that righteousness will always triumph.' },
+    ],
+    moral: 'Justice and truth are above all earthly powers; an unjust ruler brings ruin upon himself.',
+    moralNative: 'நீதியும் உண்மையும் எந்த அதிகாரத்தையும் விட மேலானது; அநீதியான ஆட்சியாளன் தன்னையே அழித்துக் கொள்வான்.',
+  },
+
+  // 18
+  {
+    title: 'Avvaiyar and the Hot Jamun Fruit',
+    titleNative: 'ஔவையாரும் சுட்ட பழமும்',
+    category: 'Kings & Scholars 🏰',
+    emoji: '🌳',
+    paragraphs: [
+      { native: 'தமிழ் மூதாட்டி ஔவையார் பசியோடு ஒரு நாவல் மரத்தின் அடியில் நடந்து சென்றார். மரத்தின் மேலே சிறுவன் உருவில் முருகப்பெருமான் அமர்ந்திருந்தான். ஔவையார் பழம் கேட்டார்.', english: 'The grand Tamil poetess Avvaiyar walked hungrily under a Jamun tree. Lord Murugan sat atop the tree in the form of a young boy. Avvaiyar asked for fruit.' },
+      { native: 'சிறுவன் கேட்டான்: "பாட்டி, உனக்கு சுட்ட பழம் வேண்டுமா, சுடாத பழம் வேண்டுமா?" ஔவையார் யோசித்தார். "பழம் எப்படி சுடும்?" என்று மனதுக்குள் நினைத்து "சுட்ட பழமே தா" என்றார்.', english: 'The boy asked: "Grandma, do you want roasted fruit or unroasted fruit?" Avvaiyar was puzzled. "How can a fruit be roasted?" she thought and said "Give me roasted fruit."' },
+      { native: 'சிறுவன் மரத்தைக் குலுக்கினான். பழங்கள் மணலில் விழுந்தன. ஔவையார் பழத்தை எடுத்து மணலை ஊதி அகற்றினார். சிறுவன் சிரித்தான்: "என்ன பாட்டி, பழம் சுடுகிறதா, ஊதுகிறாய்?"', english: 'The boy shook the tree. Jamun fruits fell onto the sand. Avvaiyar picked up a fruit and blew away the sand. The boy laughed: "What grandma, is the fruit hot that you blow on it?"' },
+      { native: 'ஔவையார் வியந்தார்! சிறுவனின் சொல்லாற்றலையும் அறிவையும் கண்டு தன் தலைக்கணத்தை உணர்ந்தார். சிறுவன் முருகனாகக் காட்சியளித்தான்.', english: 'Avvaiyar was amazed! Seeing the boy\'s wordplay and intelligence she realized her own pride. The boy revealed himself as Lord Murugan.' },
+      { native: 'எவ்வளவு கற்றிருந்தாலும் அறியாதது உலகளவு உண்டு என்பதை ஔவையார் உணர்ந்தார். கற்றது கைம்மண்ணளவு, கல்லாதது உலகளவு என்பது தமிழ் பழமொழி.', english: 'Avvaiyar realized that no matter how much one has learned, what remains unknown is as vast as the world. "What is learned is a handful of sand, what is unlearned is world-sized" is a famous Tamil proverb.' },
+    ],
+    moral: 'Never be arrogant about your knowledge. Humility opens the door to infinite learning.',
+    moralNative: 'அறிவைக் கண்டு தலைக்கணம் கொள்ளாதீர்கள். பணிவே எல்லையற்ற கற்றலுக்கு வழிவகுக்கும்.',
+  },
+
+  // 19
+  {
+    title: 'The Silks of Kanchipuram',
+    titleNative: 'காஞ்சிபுரம் பட்டு',
+    category: 'Arts & Music 🎶',
+    emoji: '🎨',
+    paragraphs: [
+      { native: 'காஞ்சிபுரம் நகரில் கந்தன் என்ற ஒரு திறமையான நெசவாளி வாழ்ந்தான். அவன் தூய தங்க முகாடி நூலால் பட்டுப் புடவைகளை நெய்தான். ஒவ்வொரு புடவையிலும் கோயில் கோபுரங்கள், மயில்கள் வடிவங்கள் இருக்கும்.', english: 'In Kanchipuram city lived a talented weaver named Kandhan. He wove silk sarees using pure gold zari threads. Every saree featured temple towers and peacock motifs.' },
+      { native: 'ஒரு நாள் ஒரு பெரிய வணிகன் வந்தான். "குறைந்த தரமான நூலைப் பயன்படுத்தி வேகமாகவும் மலிவாகவும் புடவை செய், அதிக லாபம் சம்பாதிக்கலாம்" என்றான். கந்தன் அதை மறுத்தான்.', english: 'One day a rich merchant came. "Use lower quality thread and weave faster and cheaper, we can earn huge profits," he said. Kandhan refused.' },
+      { native: 'கந்தன் சொன்னான்: "காஞ்சிப்பட்டு என்பது வெறும் துணியல்ல, அது நமது கலாச்சாரம், இறைவனுக்கு செய்யும் பணி. அதில் பொய் கலக்க மாட்டேன்." வணிகன் ஏளனம் செய்து சென்றான்.', english: 'Kandhan said: "Kanchi silk is not just cloth, it is our culture, a service to God. I will not mix deceit in it." The merchant mocked and left.' },
+      { native: 'சில மாதங்களில் மன்னரின் திருமணத்திற்கு புடவைகள் தேவைப்பட்டன. வணிகனின் மலிவான புடவைகள் சாயம் வெளுத்தன. கந்தனின் தங்கம் மின்னும் புடவைகள் மன்னரைக் கவர்ந்தன.', english: 'In a few months sarees were needed for the royal wedding. The merchant\'s cheap sarees faded color. Kandhan\'s gold-shining sarees captivated the king.' },
+      { native: 'மன்னன் கந்தனுக்கு அரச நெசவாளி பட்டம் வழங்கி கௌரவித்தான். நேர்மையும் தரமும் என்றும் அழியாது என்பதை காஞ்சிப்பட்டு உலகிற்கு பறைசாற்றுகிறது.', english: 'The king honored Kandhan with the title of Royal Weaver. Kanchi silk proclaims to the world that honesty and quality never perish.' },
+    ],
+    moral: 'Uncompromising quality and honesty in your craft create a legacy that lasts forever.',
+    moralNative: 'தொழிலில் சமரசமில்லாத தரமும் நேர்மையும் என்றுமே நிலைத்து நிற்கும் பெருமையை உருவாக்கும்.',
+  },
+
+  // 20
+  {
+    title: 'The Mother Kaveri River',
+    titleNative: 'காவிரித் தாய்',
+    category: 'Village Fables 🌾',
+    emoji: '🌊',
+    paragraphs: [
+      { native: 'குடகு மலையில் பிறந்து தஞ்சாவூர் நெற்களஞ்சியத்தை செழிக்க வைக்கும் புனித நதி காவிரி. தமிழ் மக்கள் காவிரியைத் தாயாக வணங்குகிறார்கள். ஆடிப் பெருக்கு நாளில் காவிரியை மக்கள் கொண்டாடுகிறார்கள்.', english: 'Born in Kodagu hills, River Kaveri makes the Tanjore granary flourish. Tamil people worship Kaveri as a mother. On Aadi Perukku day people celebrate Kaveri.' },
+      { native: 'ஒரு கிராமத்தில் இளங்கோ என்ற சிறுவன் இருந்தான். அவன் ஆற்று வெள்ளத்தில் இலைகளை மிதக்க விட்டு விளையாடினான். பாட்டி அவனிடம் காவிரியின் கதையைக் கூறினார்.', english: 'In a village there was a boy named Ilango. He played floating leaves in the river water. Grandmother told him the story of Kaveri.' },
+      { native: 'பாட்டி கூறினார்: "காவிரி இல்லை என்றால் தஞ்சையில் நெல் விளையாது. தாகம் தீராது. நதி நமக்கு நீரைக் கொடுக்கிறது, நாம் அதைத் தூய்மையாக வைத்திருக்க வேண்டும்."', english: 'Grandmother said: "Without Kaveri rice won\'t grow in Tanjore. Thirst won\'t be quenched. The river gives us water, we must keep it clean."' },
+      { native: 'இளங்கோ அன்று முதல் ஆற்றில் குப்பைகளைப் போடுவதை நிறுத்தினான். தன் நண்பர்களுடனும் சேர்ந்து ஆற்றங்கரை மரங்களை நட்டான்.', english: 'From that day Ilango stopped throwing trash in the river. Together with his friends he planted trees along the riverbank.' },
+      { native: 'இயற்கையைப் பாதுகாப்பது நமது கடமை. காவிரி அன்னையின் அருள் தமிழ்நாட்டை என்றுமே பசுமையாக வைத்திருக்கிறது.', english: 'Protecting nature is our duty. Mother Kaveri\'s blessings keep Tamil Nadu green forever.' },
+    ],
+    moral: 'Nature feeds and sustains us like a mother; it is our sacred duty to protect and keep her clean.',
+    moralNative: 'இயற்கை ஒரு தாயைப் போல நம்மைப் போஷிக்கிறது; அதைப் பாதுகாப்பது நமது புனிதமான கடமையாகும்.',
+  },
+
 ];
 
-export function getCultureStory(index: number, language: string = 'tamil'): CultureStory {
-  const storyId = Math.max(1, Math.min(500, index));
-  const baseIdx = (storyId - 1) % BASE_STORIES.length;
-  const cycle = Math.floor((storyId - 1) / BASE_STORIES.length) + 1;
-  const base = BASE_STORIES[baseIdx];
-  const emoji = EMOJIS[(storyId - 1) % EMOJIS.length];
+export function getStoriesArray(language: string = 'tamil'): Omit<CultureStory, 'id'>[] {
+  switch (language.toLowerCase()) {
+    case 'hindi':
+      return HINDI_STORIES;
+    case 'telugu':
+      return TELUGU_STORIES;
+    case 'malayalam':
+      return MALAYALAM_STORIES;
+    default:
+      return BASE_STORIES;
+  }
+}
 
-  const titleEng = cycle === 1 ? base.title : `${base.title} — Part ${cycle}`;
-  const titleNative = cycle === 1 ? base.titleNative : `${base.titleNative} (பாகம் ${cycle})`;
+export function getStoriesCount(language: string = 'tamil'): number {
+  return getStoriesArray(language).length;
+}
 
-  return {
-    id: storyId,
-    title: titleEng,
-    titleNative,
+export function getStoriesForLanguage(language: string = 'tamil'): CultureStory[] {
+  const stories = getStoriesArray(language);
+  return stories.map((base, idx) => ({
+    id: idx + 1,
+    title: base.title,
+    titleNative: base.titleNative,
     category: base.category,
-    emoji,
+    emoji: EMOJIS[idx % EMOJIS.length],
     paragraphs: base.paragraphs,
     moral: base.moral,
     moralNative: base.moralNative,
-  };
+  }));
+}
+
+export function getCultureStory(index: number, language: string = 'tamil'): CultureStory {
+  const stories = getStoriesForLanguage(language);
+  const safeIdx = Math.max(0, Math.min(stories.length - 1, index - 1));
+  return stories[safeIdx];
 }

@@ -4,6 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 
+import { useAuth } from '../../context/AuthContext';
+
 type Props = {
   gameTitle?: string;
   gameIcon?: string;
@@ -26,6 +28,9 @@ export default function LevelsListUI({
   onSelectLevel
 }: Props) {
   const router = useRouter();
+  const { user } = useAuth();
+  const lang = (user?.learningLanguage || 'tamil').toLowerCase();
+  const userKey = user?.email ? user.email.toLowerCase().replace(/[^a-z0-9]/g, '_') : (user?.id || 'guest');
   // The tier being viewed right now — this decides whether content shown at each
   // level is alphabet/word-based (Beginner), sentence/tough-word (Intermediate)
   // or hard-word/hard-sentence (Pro). Must come from initialTab (falls back to
@@ -34,10 +39,10 @@ export default function LevelsListUI({
   const [completedMaxLevel, setCompletedMaxLevel] = useState<number>(0);
 
   useEffect(() => {
-    AsyncStorage.getItem(`@game_${gameKey}_${userTier}_completed`).then(val => {
+    AsyncStorage.getItem(`@game_${userKey}_${lang}_${gameKey}_${userTier}_completed`).then(val => {
       setCompletedMaxLevel(val ? parseInt(val, 10) : 0);
     });
-  }, [gameKey, userTier]);
+  }, [userKey, lang, gameKey, userTier]);
 
   // Generate 1000 levels
   const levels = Array.from({ length: 1000 }, (_, i) => i + 1);

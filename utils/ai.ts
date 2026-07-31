@@ -330,9 +330,9 @@ export async function generatePracticeLesson(skill: string, level: string, langu
   CRITICAL INSTRUCTION: Select a COMPLETELY RANDOM, highly varied set of 50 words, phrases, or grammar rules from a massive pool. Do not repeat the same exercises every time. Shuffle your selection. (Random seed: ${Math.random()})
   
   CRITICAL DIFFICULTY INSTRUCTIONS:
-  - If ${level} includes "Beginner", make the exercises very simple, using basic, common words and short sentences.
-  - If ${level} includes "Intermediate", use conversational grammar and moderate vocabulary.
-  - If ${level} includes "Pro" or "Advanced", use extremely tough and highly advanced vocabulary. Every single word and scenario must be very challenging, including rare words, complex grammar, and difficult literary terms.
+  - If ${level} includes "Beginner", focus on alphabets, consonants, vowels, and simple 1-2 word basic words.
+  - If ${level} includes "Intermediate", focus on tough words and short 3-5 word sentences.
+  - If ${level} includes "Pro" or "Advanced", focus on typical sentences, complex grammar, and long 5-10+ word sentences.
   
   The 'question' text MUST be in English.
   The 4 'options' MUST be written in the native ${language} script.
@@ -510,9 +510,9 @@ export async function generateFlashcardLesson(skill: string, level: string, lang
   CRITICAL INSTRUCTION: Select a COMPLETELY RANDOM, highly varied set of 10 words from a massive pool of ${language} vocabulary suitable for this level. DO NOT output the same common words every time. Shuffle your selection. (Random seed: ${Math.random()})
   
   DIFFICULTY:
-  - "Beginner": simple nouns (animals, food, colors, family) or basic verbs.
-  - "Intermediate": intermediate phrases, emotions, weather, or conversational terms.
-  - "Pro" or "Advanced": EXTREMELY TOUGH vocabulary. Every single word must be highly advanced, rare, difficult professional terms, obscure idioms, or complex abstract concepts. No simple words allowed!
+  - "Beginner": alphabets, consonants, vowels, and simple 1-2 word basic words.
+  - "Intermediate": tough words and short 3-5 word sentences.
+  - "Pro" or "Advanced": typical sentences, complex grammar, and long 5-10+ word sentences.
 
   'term' MUST be the native ${language} word/phrase.
   'translation' MUST be the English translation.
@@ -635,9 +635,9 @@ export async function generateReadingLesson(level: string, language: string): Pr
   CRITICAL INSTRUCTION: Write a COMPLETELY RANDOM, highly varied story. Choose a unique topic, characters, or situation every single time. DO NOT write the same common topics over and over again. Be creative. (Random seed: ${Math.random()})
   
   CRITICAL DIFFICULTY INSTRUCTIONS: 
-  - If ${level} includes "Beginner", write 3-4 very simple sentences about daily life, animals, or food.
-  - If ${level} includes "Intermediate", write a short paragraph about a cultural event or a trip with moderate vocabulary.
-  - If ${level} includes "Pro", write a complex story, folk tale, or article with advanced grammar and idioms.
+  - If ${level} includes "Beginner", focus on alphabets, consonants, vowels, and simple 1-2 word basic words in 2-3 short sentences.
+  - If ${level} includes "Intermediate", write short stories with tough words and 3-5 word sentences.
+  - If ${level} includes "Pro" or "Advanced", write longer stories with typical complex sentences, advanced grammar, and literary phrases.
   
   Provide the following in your JSON response:
   1. 'title': Story title in ${language}.
@@ -851,10 +851,34 @@ OVERALL_FORM: <number>`;
   }
 }
 
-export type PronunciationPhrase = {
-  phrase: string;
-  english: string;
-};
+export function isSingleLetterOrAlphabet(phrase: string, english?: string): boolean {
+  if (!phrase) return true;
+  const cleanPhrase = phrase.trim();
+  
+  // Rule 1: Length 1 is always a single letter
+  if (cleanPhrase.length <= 1) return true;
+
+  // Rule 2: Single consonant with diacritic/virama (e.g. க், ங், ச், பூ, பா)
+  const baseChars = cleanPhrase.replace(/[\u0B80-\u0B83\u0BBE-\u0BCD\u0900-\u0903\u093E-\u094D\u0C01-\u0C03\u0C3E-\u0C4D\u0D01-\u0D03\u0D3E-\u0D4D]/g, '');
+  if (baseChars.length <= 1) return true;
+
+  // Rule 3: Check English translation label
+  if (english) {
+    const cleanEng = english.toLowerCase().trim();
+    if (
+      cleanEng.includes('vowel') || 
+      cleanEng.includes('consonant') || 
+      cleanEng.includes('alphabet') ||
+      cleanEng.includes('letter') ||
+      cleanEng.length <= 1 ||
+      /^[a-z]\s*\(.*\)$/i.test(cleanEng)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 export async function generatePronunciationPhrases(level: string, language: string): Promise<PronunciationPhrase[]> {
   if (!hasApiKey()) throw new Error('API Key is missing');
@@ -865,19 +889,20 @@ export async function generatePronunciationPhrases(level: string, language: stri
   });
 
   const prompt = `You are a language teacher for ${language}. The user is at level: ${level}.
-  Generate exactly 10 phrases for a pronunciation practice exercise.
+  Generate exactly 10 multi-word phrases or multi-character vocabulary words for a pronunciation practice exercise.
   
-  CRITICAL INSTRUCTION: Select 10 completely random, highly varied phrases. (Random seed: ${Math.random()})
-  If ${level} includes "Beginner", use simple 1-2 word common phrases (e.g. Hello, Thank you, Water).
-  If ${level} includes "Intermediate", use conversational sentences with 3-5 words (e.g. I am going to the store).
-  If ${level} includes "Pro" or "Advanced", use tough tongue-twisters, complex grammatical sentences, or advanced cultural idioms with 5-10 words.
+  CRITICAL STRICT RULES:
+  1. DO NOT output single letters, alphabets, isolated vowels, or isolated consonants (e.g. NEVER output 'அ', 'ஆ', 'க்', 'A (Vowel)', 'K (Consonant)').
+  2. ALWAYS use full, multi-letter words or complete real-world sentences (e.g. 'அம்மா' / 'Mother', 'தண்ணீர்' / 'Water', 'வணக்கம்' / 'Hello', 'குடும்பம்' / 'Family').
+  3. Every phrase MUST be a real multi-letter word or sentence.
   
   Provide a JSON array of exactly 10 objects. Keys: phrase (string in ${language} script), english (string translation).`;
 
   try {
     const result = await model.generateContent(prompt);
     const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(text) as PronunciationPhrase[];
+    const parsed = JSON.parse(text) as PronunciationPhrase[];
+    return parsed.filter(p => !isSingleLetterOrAlphabet(p.phrase, p.english));
   } catch (error) {
     console.warn("Error generating pronunciation phrases:", error);
     throw error;
